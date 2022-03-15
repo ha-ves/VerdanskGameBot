@@ -1,0 +1,17 @@
+{
+  "profiles": {
+    "VerdanskGameBot": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "BotToken": "OTQ5NzU4ODE0NDQ0NDc4NTU0.YiPB0w.yvUrmpA2oPvln5NS0e8tutnltTs"
+      }
+    },
+    "WSL": {
+      "commandName": "WSL2",
+      "environmentVariables": {
+        "BotToken": "OTQ5NzU4ODE0NDQ0NDc4NTU0.YiPB0w.yvUrmpA2oPvln5NS0e8tutnltTs"
+      },
+      "distributionName": ""
+    }
+  }
+}
