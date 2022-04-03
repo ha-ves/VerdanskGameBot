@@ -6,13 +6,13 @@ namespace VerdanskGameBot
 {
     internal class AddServerModalBuilder : ModalBuilder
     {
-        internal Task<AddServerModalBuilder> Get(string servername)
+        internal AddServerModalBuilder(string servername)
         {
             WithTitle($"Add \"{servername}\" to watch list");
             WithCustomId(new CustomID
             {
                 Source = "addserver",
-                Options = new Dictionary<string, object> { { "servername", servername } }
+                Options = new Dictionary<string, object> { { "servername", servername + " " } }
             }.Serialize());
             AddComponents(new List<IMessageComponent>
             {
@@ -52,14 +52,12 @@ namespace VerdanskGameBot
                 new TextInputBuilder
                 {
                     CustomId = "rcon_pass",
-                    Label = "Password for RCON login",
-                    Placeholder = "i.e. yousuck",
+                    Label = "Password to check server (RCON)",
+                    Placeholder = "i.e. yousux",
                     Required = true,
                     Style = TextInputStyle.Short
                 }.Build()
             }, 0);
-
-            return Task.FromResult(this);
         }
     }
 }

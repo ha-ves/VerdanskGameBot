@@ -1,12 +1,14 @@
 ﻿using Discord;
 using Discord.Net;
 using Discord.WebSocket;
+using Microsoft.Extensions.Configuration;
 using NLog;
 using NLog.Targets;
 using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace VerdanskGameBot
@@ -14,43 +16,81 @@ namespace VerdanskGameBot
     class Program
     {
         #region Main & Logging
-        static internal Program Current;
-        static Task Main(string[] args)
-        {
-            Parallel.ForEach(LogManager.Configuration.AllTargets.Where(it => it.GetType() == typeof(FileTarget)), target =>
-            {
-                var filepath = (target as FileTarget).FileName.Render(null);
-                if (File.Exists(filepath))
-                {
-                    var createTime = File.GetCreationTime(filepath);
-                    var splitpath = filepath.Split('.');
-                    File.Move(filepath, $"{splitpath[0]}_{createTime.ToString("yyyy-MM-dd_HH-mm-ss")}.{splitpath[1]}");
-                }
-            });
 
-            Current = new Program();
-            Current.MainApp().Wait();
+        internal static Logger Log = LogManager.GetCurrentClassLogger();
+        private bool IsVerbose = false;
+        internal static CancellationTokenSource ExitCancel = new CancellationTokenSource();
+        internal static bool IsExiting = false;
+
+        private static void Main(string[] args)
+        {
+            Parallel.ForEach(LogManager.Configuration.AllTargets.Where(it => it.GetType() == typeof(FileTarget)), new ParallelOptions { CancellationToken = ExitCancel.Token }, target =>
+           {
+               var filepath = (target as FileTarget).FileName.Render(null);
+               if (File.Exists(filepath))
+               {
+                   var createTime = File.GetCreationTime(filepath);
+                   var splitpath = filepath.Split('.');
+                   File.Move(filepath, $"{splitpath[0]}_{createTime:yyyy-MM-dd_HH-mm-ss}.{splitpath[1]}");
+               }
+           });
+
+            new Program().MainApp();
+
+            Console.CancelKeyPress += Console_SIGINT;
+            AppDomain.CurrentDomain.ProcessExit += Process_SIGTERM;
 
             while (true)
             {
                 var cmd = Console.ReadLine();
                 if (cmd == "exit")
                 {
-                    Log.Info("=== Verdansk GameBot Stop initialized ===");
-                    Current.BotClient.StopAsync().Wait();
+                    Console_SIGINT(null, null);
                     break;
                 }
             }
+        }
+
+        private static void Process_SIGTERM(object sender, EventArgs e)
+        {
+            if(!IsExiting)
+                ExitRequested();
+        }
+
+        private static void Console_SIGINT(object sender, ConsoleCancelEventArgs e)
+        {
+            ExitRequested();
+
+            Environment.Exit(0);
+        }
+
+        private static void ExitRequested()
+        {
+            Log.Info("=== Verdansk GameBot Stop initialized ===");
+
+            IsExiting = true;
+
+            ExitCancel.Cancel();
+            ExitCancel.Dispose();
+
+            GameServerWatcher.Dispose();
+
+            if (BotClient != null)
+            {
+                BotClient.StopAsync().Wait();
+                BotClient.DisposeAsync().AsTask().Wait();
+            }
+
+            Task.Delay(100).Wait();
 
             Log.Info("");
             Log.Info("=====[ Verdansk GameBot Stopped ]=====");
             Log.Info("");
-            return Task.CompletedTask;
+
+            NLog.LogManager.Shutdown();
         }
 
-        static internal readonly Logger Log = LogManager.GetCurrentClassLogger();
-        bool IsVerbose = false;
-        Task ClientLog(LogMessage msg)
+        private Task ClientLog(LogMessage msg)
         {
             var logmsg = msg.ToString(prependTimestamp: false);
             switch (msg.Severity)
@@ -82,15 +122,36 @@ namespace VerdanskGameBot
         }
         #endregion
 
-        DiscordSocketClient BotClient;
-        internal CommandService CmdSvc;
-        GameServerWatcher Watcher;
+        internal static DiscordSocketClient BotClient;
 
-        async Task MainApp()
+        private void MainApp()
         {
             Log.Info("");
             Log.Info("=====[ Starting Verdansk GameBot ]=====");
             Log.Info("");
+
+            var token = "";
+
+            try
+            {
+                token = new ConfigurationBuilder()
+#if DEBUG
+                .AddUserSecrets<Program>().Build()["BotToken"];
+#else
+                .AddJsonFile("BotConfig.json").Build()["BotToken"];
+#endif
+            }
+            catch (Exception ex)
+            {
+                Log.Trace(ex);
+            }
+
+            if (string.IsNullOrEmpty(token))
+            {
+                Log.Error("No discord application token specified. Please specify \"BotToken\": \"<DISCORD_APP_TOKEN>\" in \"BotConfig.json\" in the same folder as executable.");
+                Environment.Exit(-1);
+                return;
+            }
 
             BotClient = new DiscordSocketClient(new DiscordSocketConfig()
             {
@@ -100,24 +161,21 @@ namespace VerdanskGameBot
             BotClient.Log += ClientLog;
             BotClient.Ready += OnBotReady;
 
-            await BotClient.SetActivityAsync(new Game("\r\nRefugees", ActivityType.Watching));
-
-            var token = Environment.GetEnvironmentVariable("BotToken");
-
-            await BotClient.LoginAsync(TokenType.Bot, token);
-            await BotClient.StartAsync();
+            BotClient.SetActivityAsync(new Game("\r\nRefugees", ActivityType.Watching)).Wait();
+            BotClient.LoginAsync(TokenType.Bot, token).Wait();
+            BotClient.StartAsync().Wait();
         }
 
-        async Task OnBotReady()
+        private Task OnBotReady()
         {
-            CmdSvc = new CommandService(BotClient);
-            Watcher = new GameServerWatcher();
+            CommandService.StartService(BotClient);
+            GameServerWatcher.StartWatcher();
 
             Log.Info("");
             Log.Info("=====[ Verdansk GameBot Started ]=====");
             Log.Info("");
 
-
+            return Task.CompletedTask;
         }
     }
 }

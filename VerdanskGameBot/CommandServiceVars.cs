@@ -4,9 +4,9 @@ using System.Collections.Generic;
 
 namespace VerdanskGameBot
 {
-    partial class CommandService
+    internal partial class CommandService
     {
-        internal static SlashCommandOptionBuilder Servername = new SlashCommandOptionBuilder
+        internal static SlashCommandOptionBuilder Servername = new()
         {
             Name = "servername",
             Description = "Private server name defined by you (Admin).",
@@ -14,7 +14,7 @@ namespace VerdanskGameBot
             IsRequired = true,
         };
 
-        internal static List<SlashCommandBuilder> Commands = new List<SlashCommandBuilder>
+        internal static List<SlashCommandBuilder> Commands = new()
         {
             //game servers command
             new SlashCommandBuilder

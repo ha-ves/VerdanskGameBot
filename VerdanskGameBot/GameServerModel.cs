@@ -40,7 +40,7 @@ namespace VerdanskGameBot
         /// <summary>
         /// Is the server online?
         /// </summary>
-        [Required, Column("is_online")]
+        [NotMapped]
         public bool IsOnline { get; set; }
         /// <summary>
         /// Last time the server is online
@@ -49,10 +49,28 @@ namespace VerdanskGameBot
         public DateTimeOffset LastOnline { get; set; }
 
         /// <summary>
+        /// Link to game
+        /// </summary>
+        [Column("game_link"), MaxLength(100)]
+        public string GameLink { get; set; }
+
+        /// <summary>
         /// Round-trip-time
         /// </summary>
-        [Column("rtt")]
-        public ushort RTT{ get; set; }
+        [NotMapped]
+        public ushort RTT { get; set; }
+
+        /// <summary>
+        /// Current number of players in game server
+        /// </summary>
+        [NotMapped]
+        public byte Players { get; set; }
+
+        /// <summary>
+        /// Max players
+        /// </summary>
+        [NotMapped]
+        public byte MaxPlayers { get; set; }
 
         /// <summary>
         /// Who added the server
@@ -73,24 +91,31 @@ namespace VerdanskGameBot
         /// <summary>
         /// IP Address of the game server
         /// </summary>
-        [Required, Column("ip")]
+        [Required, Column("game_ip")]
         public IPAddress IP { get; set; }
 
         /// <summary>
         /// Port to join the game server
         /// </summary>
-        [Required, Column("port")]
+        [Required, Column("game_port")]
         public ushort GamePort { get; set; }
+
+        /// <summary>
+        /// RCON IP
+        /// </summary>
+        [Required, Column("rcon_ip")]
+        public IPAddress RconIP { get; set; }
 
         /// <summary>
         /// Port to administer the server (RCON)
         /// </summary>
-        [Required, Column("rcon")]
+        [Required, Column("rcon_port")]
         public ushort RconPort { get; set; }
+
         /// <summary>
         /// Plain-text password for RCON
         /// </summary>
-        [Required, Column("pass")]
+        [Required, Column("rcon_pass")]
         public string RconPass { get; set; }
 
         /// <summary>
@@ -112,7 +137,13 @@ namespace VerdanskGameBot
         /// <summary>
         /// Extended configuration needs
         /// </summary>
-        [Column("config")]
-        public string Config { get; set; }
+        [NotMapped]
+        public string ErrMsg { get; set; }
+
+        /// <summary>
+        /// Note about the game server
+        /// </summary>
+        [Column("note")]
+        public string Note { get; set; }
     }
 }

@@ -7,6 +7,10 @@ using System.Threading.Tasks;
 
 namespace VerdanskGameBot
 {
+    internal class AppExitException : Exception
+    {
+    }
+
     static partial class Extensions
     {
     }

@@ -14,52 +14,130 @@ using System.Threading.Tasks;
 
 namespace VerdanskGameBot
 {
-    partial class CommandService
+    internal partial class CommandService
     {
-        internal CommandService(DiscordSocketClient botclient)
+        internal static void StartService(DiscordSocketClient botclient)
         {
-            BotClient = botclient;
+            botclient.SlashCommandExecuted += SlashCommand_Executed;
+            botclient.ModalSubmitted += ModalSubmit_Executed;
+            botclient.ButtonExecuted += ButtonClick_Executed;
 
-            botclient.SlashCommandExecuted += SlashCommandExecuted;
-            botclient.ModalSubmitted += ModalSubmitted;
-            botclient.ButtonExecuted += ButtonExecuted;
-
-            PostCommands(Commands);
+            try { Task.Run(() => PostCommands(botclient, Commands), Program.ExitCancel.Token); }
+            catch { return; }
         }
 
-        //temp to guild verdansk
-        DiscordSocketClient BotClient;
+        #region Events / Run on Bot thread (SHOULD NOT BLOCK)
 
-        internal async Task PostCommands(List<SlashCommandBuilder> commands)
+        private static void PostCommands(DiscordSocketClient bot, List<SlashCommandBuilder> commands)
         {
-            var verdansk = BotClient.Guilds.Where(guild => guild.Id == 790540532714831882).First();
+            Program.Log.Debug("Posting commands to guild.");
+
+            var verdansk = bot.Guilds.Where(guild => guild.Id == 790540532714831882).First();
 
             try
             {
-                Parallel.ForEach(commands, cmd =>
+                commands.ForEach(async cmd =>
                 {
-                    verdansk.BulkOverwriteApplicationCommandAsync(new ApplicationCommandProperties[] { cmd.Build() }).Wait();
+                    await verdansk.BulkOverwriteApplicationCommandAsync(new ApplicationCommandProperties[] { cmd.Build() });
+                    Program.Log.Trace($"/{cmd.Name} command posted to {verdansk}");
                 });
             }
             catch (Discord.Net.HttpException exc)
             {
-                Debugger.Break();
+                Program.Log.Debug(exc, "Failed to post commands to guild.");
             }
+
+            Program.Log.Debug("Successfully posted commands to guild.");
         }
 
-        async Task SlashCommandExecuted(SocketSlashCommand cmd)
+        internal static void UpdateGameServerStatusMessage(DiscordSocketClient bot, GameServerModel gameserver)
         {
-            switch (cmd.CommandName)
-            {
-                case "server":
-                    await GameServerCmdHandler(cmd);
-                    break;
-                default:
-                    break;
-            }
+            var embeds = new List<Embed> { new GameServerEmbedBuilder(gameserver).Build() };
+            if (!string.IsNullOrEmpty(gameserver.ErrMsg))
+                embeds.Add(new EmbedBuilder().AddField("! Attention !", gameserver.ErrMsg).Build());
+
+            (bot.GetChannelAsync(gameserver.ChannelId).Result as ITextChannel)
+                .ModifyMessageAsync(gameserver.MessageId, msg =>
+                {
+                    msg.Content = "";
+                    msg.Embeds = embeds.ToArray();
+                }).Wait();
         }
 
-        async Task GameServerCmdHandler(SocketSlashCommand cmd)
+        private static Task SlashCommand_Executed(SocketSlashCommand cmd)
+        {
+            try
+            {
+                Task.Run(() =>
+                {
+                    switch (cmd.CommandName)
+                    {
+                        case "server":
+                            GameServerCmdHandler(Program.BotClient, cmd);
+                            break;
+                        default:
+                            break;
+                    }
+                }, Program.ExitCancel.Token);
+            }
+            catch { return Task.FromException(new AppExitException()); }
+
+            return Task.CompletedTask;
+        }
+
+        private static Task ButtonClick_Executed(SocketMessageComponent arg)
+        {
+            try
+            {
+                Task.Run(() =>
+                {
+                    var customid = CustomID.Deserialize(arg.Data.CustomId);
+
+                    switch (customid.Source)
+                    {
+                        case "addserver":
+                            AddServerTryAgainHandler(arg, customid);
+                            break;
+                        default:
+                            break;
+                    }
+                }, Program.ExitCancel.Token);
+            }
+            catch { return Task.FromException(new AppExitException()); }
+
+            return Task.CompletedTask;
+        }
+
+        private static Task ModalSubmit_Executed(SocketModal modal)
+        {
+            try
+            {
+                Task.Run(() =>
+                {
+                    var customid = CustomID.Deserialize(modal.Data.CustomId);
+
+                    switch (customid.Source)
+                    {
+                        case "addserver":
+                            AddServerModalSubmitHandler(modal);
+                            break;
+                        default:
+                            break;
+                    }
+                }, Program.ExitCancel.Token);
+            }
+            catch { return Task.FromException(new AppExitException()); }
+
+            return Task.CompletedTask;
+        }
+
+        #endregion
+
+        #region Slash Command Handlers
+
+        #region /server Command Handlers
+
+        private static void GameServerCmdHandler(DiscordSocketClient bot, SocketSlashCommand cmd)
         {
             var subcmd = cmd.Data.Options.First();
 
@@ -68,70 +146,71 @@ namespace VerdanskGameBot
             switch (subcmd.Name)
             {
                 case "list":
-                    await GameServerListingHandler(cmd);
+                    GameServerListingHandler(cmd);
                     break;
                 case "add":
-                    await GameServerAdderHandler(cmd, subcmd.Options);
+                    GameServerAdderHandler(cmd, subcmd.Options);
                     break;
                 case "movehere":
-                    await GameServerMoverHandler(cmd, subcmd.Options);
+                    GameServerMoverHandler(bot, cmd, subcmd.Options);
                     break;
                 case "remove":
-                    await GameServerRemovalHandler(cmd, subcmd.Options);
+                    GameServerRemovalHandler(bot, cmd, subcmd.Options);
                     break;
                 default:
-                    await cmd.RespondAsync("Command invalid.", ephemeral: true);
+                    cmd.RespondAsync("Command invalid.", ephemeral: true).Wait();
                     break;
             }
 
-            if (cmd.HasResponded) Program.Log.Debug("^ Responded successfully.");
+            Program.Log.Debug(cmd.HasResponded ? "^ Responded successfully." : "^ No response sent.");
         }
 
-        internal async Task GameServerUpdate(GameServerModel gameserver)
-        {
-            await (await BotClient.GetChannelAsync(gameserver.ChannelId) as ITextChannel)
-                .ModifyMessageAsync(gameserver.MessageId, async msg =>
-                {
-                    msg.Content = "";
-                    msg.Embed = (await new GameServerEmbedBuilder().Get(gameserver)).Build();
-                });
-        }
-
-        async Task GameServerListingHandler(SocketSlashCommand cmd)
+        private static void GameServerListingHandler(SocketSlashCommand cmd)
         {
             var guild = (cmd.Channel as SocketGuildChannel).Guild;
-            using (var db = new GameServersDb())
-            {
-                if (db.GameServers.Count() > 0)
-                {
-                    var listing = await cmd.FollowupAsync(embed: new EmbedBuilder()
-                        .WithColor(Discord.Color.Gold)
-                        .WithTitle($":desktop: {guild.Name}'s Game Server Watch List")
-                        .WithThumbnailUrl(guild.IconUrl)
-                        .AddField($"{db.GameServers.Count()} Game Servers", $"There are {db.GameServers.Count()} game servers in watch list. Fetching servers...")
-                        .Build()
-                    , ephemeral: true);
 
-                    db.GameServers.ToList().ForEach(async gameserver =>
-                    {
-                        await listing.ModifyAsync(async msg => msg.Embeds = msg.Embeds.Value.Append(
-                            (await new GameServerEmbedBuilder().Get(gameserver)).Build()).ToArray());
-                    });
-                }
-                else
-                {
-                    await cmd.RespondAsync(embed: new EmbedBuilder()
-                        .WithColor(Discord.Color.Gold)
-                        .WithTitle($":desktop: {guild.Name}'s Game Server Watch List")
-                        .WithThumbnailUrl(guild.IconUrl)
-                        .AddField("Empty", "No game server in watch list.")
-                        .Build()
-                    , ephemeral: true);
-                }
+            List<GameServerModel> gameservers;
+
+            try
+            {
+                using (var db = new GameServersDb())
+                    gameservers = db.GameServers.ToList();
+            }
+            catch (Exception)
+            {
+                cmd.RespondAsync("Something is wrong, please try again.", ephemeral: true);
+
+                return;
+            }
+
+            if (gameservers.Any())
+            {
+                cmd.RespondAsync(embed: new EmbedBuilder()
+                    .WithColor(Discord.Color.Gold)
+                    .WithTitle($":desktop: {guild.Name}'s Game Server Watch List")
+                    .WithThumbnailUrl(guild.IconUrl)
+                    .AddField($"{gameservers.Count} Game Servers", $"There are {gameservers.Count} game servers in watch list. Fetching servers...")
+                    .Build()
+                , ephemeral: true).Wait();
+
+                var embeds = new List<Embed>();
+
+                if(Parallel.ForEach(gameservers, gameserver => embeds.Add(new GameServerEmbedBuilder(gameserver).Build())).IsCompleted)
+                    cmd.ModifyOriginalResponseAsync(msg => msg.Embeds = embeds.ToArray()).Wait();
+            }
+            else
+            {
+                cmd.RespondAsync(embed: new EmbedBuilder()
+                    .WithColor(Discord.Color.Gold)
+                    .WithTitle($":desktop: {guild.Name}'s Game Server Watch List")
+                    .WithThumbnailUrl(guild.IconUrl)
+                    .AddField("Empty", "No game server in watch list.")
+                    .Build()
+                , ephemeral: true).Wait();
             }
         }
 
-        async Task GameServerAdderHandler(SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
+        private static void GameServerAdderHandler(SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
         {
             var guild = (cmd.Channel as SocketGuildChannel).Guild;
             var servername = options.First().Value as string;
@@ -141,175 +220,175 @@ namespace VerdanskGameBot
                 if (db.GameServers.Any(server => server.ServerName == servername))
                 {
                     Program.Log.Warn($"{servername} already exist in watch list database. Not added.");
-                    await cmd.RespondAsync($"Failed to add game server because\r\n" +
+                    cmd.RespondAsync($"Failed to add game server because\r\n" +
                         $"servername : `{servername}`\r\n" +
-                        $"already exist in watch list.", ephemeral: true);
+                        $"already exist in watch list.", ephemeral: true).Wait();
                     return;
                 }
             }
 
             if (!servername.All(ch => char.IsLetterOrDigit(ch) && char.IsLower(ch)) || servername.Length > 22)
             {
-                await cmd.RespondAsync($"***servername*** : `{servername}` is invalid.\r\n" +
+                cmd.RespondAsync($"***servername*** : `{servername}` is invalid.\r\n" +
                     "Servername must be alphabets only (a-z) without whitespaces and up to 22 letters",
-                    ephemeral: true);
+                    ephemeral: true).Wait();
                 return;
             }
 
-            await cmd.RespondWithModalAsync((await new AddServerModalBuilder().Get(servername)).Build());
+            cmd.RespondWithModalAsync(new AddServerModalBuilder(servername).Build()).Wait();
         }
 
-        async Task GameServerMoverHandler(SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
+        private static void GameServerMoverHandler(DiscordSocketClient bot, SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
         {
+            GameServerModel theserver;
+
             using (var db = new GameServersDb())
-            {
-                var theserver = await Task.Run(() => db.GameServers.First(srv => srv.ServerName == options.First().Value as string));
+                theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == options.First().Value as string);
 
-                var oldembed = (await ((await BotClient.GetChannelAsync(theserver.ChannelId)) as ITextChannel).GetMessageAsync(theserver.MessageId)).Embeds.First() as Embed;
+            if (theserver == null)
+                cmd.RespondAsync($"**No game server with name `{options.First().Value}` found. Try again.**").Wait();
 
-                await cmd.Channel.SendMessageAsync(embed: oldembed);
-                theserver.ChannelId = cmd.Channel.Id;
-            }
+            var olmsg = (bot.GetChannelAsync(theserver.ChannelId).Result as ITextChannel).GetMessageAsync(theserver.MessageId).Result;
+            var oldembed = olmsg.Embeds.First() as Embed;
+
+            cmd.Channel.SendMessageAsync(embed: oldembed).Wait();
+            
+            theserver.ChannelId = cmd.Channel.Id;
+
+            olmsg.DeleteAsync().Wait();
         }
 
-        async Task GameServerRemovalHandler(SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
+        private static void GameServerRemovalHandler(DiscordSocketClient bot, SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
         {
+            GameServerModel theserver;
+
             using (var db = new GameServersDb())
             {
-                var theserver = await Task.Run(() => db.GameServers.First(srv => srv.ServerName == options.First().Value as string));
+                theserver = db.GameServers.First(srv => srv.ServerName == options.First().Value as string);
 
-                await GameServerWatcher.RemoveAsync(theserver);
-                
                 db.Remove(theserver);
-                await db.SaveChangesAsync();
-
-                await ((await BotClient.GetChannelAsync(theserver.ChannelId)) as ITextChannel).DeleteMessageAsync(theserver.MessageId);
+                db.SaveChanges();
             }
+
+            GameServerWatcher.RemoveWatcher(theserver);
+
+            (bot.GetChannelAsync(theserver.ChannelId).Result as ITextChannel).DeleteMessageAsync(theserver.MessageId).Wait();
         }
 
-        async Task ModalSubmitted(SocketModal modal)
+        #endregion
+
+        #endregion
+
+        #region Modal Submit Handlers
+
+        private static void AddServerModalSubmitHandler(SocketModal modal)
         {
             var guild = (modal.Channel as SocketTextChannel).Guild;
             var components = modal.Data.Components;
 
             var customid = CustomID.Deserialize(modal.Data.CustomId);
 
-            switch (customid.Source)
+            Program.Log.Debug($"User {modal.User} requested to add game server \"{(customid.Options["servername"] as string).Trim()}\" to watch list for guild \"{guild}\"...");
+
+            var host_ip = components.First(cmp => cmp.CustomId == "host_ip").Value;
+
+            modal.DeferAsync(ephemeral: true).Wait();
+            var placeholder = modal.Channel.SendMessageAsync("***Adding a game server to watch list...***").Result;
+
+            var addresult = GameServerWatcher.AddGameServer(modal, placeholder);
+
+            if (addresult.IsCompletedSuccessfully)
             {
-                case "addserver":
-                    Program.Log.Debug($"User {modal.User} requested to add game server \"{customid.Options["servername"]}\" to watch list for guild \"{guild}\"...");
+                Program.Log.Info($"User {{ {modal.User} }} Added game server \"{(customid.Options["servername"] as string).Trim()}\" to watch list for guild \"{guild}\".");
 
-                    var host_ip = components.First(cmp => cmp.CustomId == "host_ip").Value;
-                    var gameport = components.First(cmp => cmp.CustomId == "game_port").Value;
-                    var rconport = components.First(cmp => cmp.CustomId == "rcon_port").Value;
+                modal.FollowupAsync($"<@{modal.User.Id}> Added a game server to watch list on this channel (<#{modal.Channel.Id}>).").Wait();
+                placeholder.ModifyAsync(msg =>
+                {
+                    msg.Content = "*Now checking if the server is online...*";
+                    msg.Embed = new GameServerEmbedBuilder(addresult.Result).Build();
+                }).Wait();
 
-                    await modal.DeferAsync(true);
-                    var placeholder = await modal.Channel.SendMessageAsync("***Adding a game server to watch list...***");
+                var cancel = new CancellationTokenSource(5000);
 
-                    var addresult = await GameServerWatcher.Add(modal, placeholder);
-
-                    if (addresult.IsCompletedSuccessfully)
+                var checker = Task.Run(() =>
+                {
+                    while (!addresult.Result.IsOnline)
                     {
-                        Program.Log.Info($"User {{ {modal.User} }} Added game server \"{customid.Options["servername"]}\" to watch list for guild \"{guild}\".");
-
-                        await modal.FollowupAsync($"{modal.User.ToString()} Added ***{customid.Options["servername"]}*** to watch list on this channel (<#{modal.Channel.Id}>).");
-                        await placeholder.ModifyAsync(msg => msg.Content = "*Now checking if the server is online...*");
-
-                        var canceltoken = new CancellationTokenSource();
-
-                        await Task.WhenAny(Task.Run(() =>
-                        {
-                            while (!addresult.Result.IsOnline) ;
-                        }, canceltoken.Token), Task.Run(async () =>
-                        {
-                            for (int i = 5; i > 0; i--)
-                            {
-                                await Task.Delay(1000);
-                                await placeholder.ModifyAsync(msg => msg.Content = $"*Now checking if the server is online... **{i}***");
-                            }
-                        }, canceltoken.Token));
-                        canceltoken.Cancel();
-
-                        await placeholder.ModifyAsync(async msg =>
-                        {
-                            msg.Content = "";
-                            msg.Embed = (await new GameServerEmbedBuilder().Get(addresult.Result)).Build();
-                        });
+                        Task.Delay(250).Wait();
+                        Debug.WriteLine("Waiting for server to came up as online...");
                     }
-                    else
+                }, cancel.Token);
+                var strer = Task.Run(() =>
+                {
+                    for (int i = 5; i > 0; i--)
                     {
-                        string errormsg = "";
-                        switch (addresult.Exception.GetBaseException())
-                        {
-                            case FormatException formexc:
-                                errormsg = $"Failed to add game server ***{customid.Options["servername"]}***, Game/RCON port number is not valid.";
-                                break;
-                            case InvalidOperationException invopexc:
-                                errormsg = $"Failed to find game server on `{host_ip}`, Make sure it is discoverable publicly and try again.";
-                                break;
-                            case AlreadyExistException existexc:
-                                errormsg = "Game server with the same Public IP and Port exist. Can't add the same server to watch list more than one instance.";
-                                break;
-                            default:
-                                errormsg = "Failed to add game server, Try again.";
-                                break;
-                        }
-
-                        Program.Log.Debug(errormsg);
-
-                        customid.Options.Add("btn", "try-again");
-
-                        await placeholder.DeleteAsync();
-
-                        await modal.ModifyOriginalResponseAsync(msg =>
-                        {
-                            msg.Content = errormsg;
-                            msg.Components = new ComponentBuilder()
-                            .AddRow(new ActionRowBuilder()
-                                .AddComponent(new ButtonBuilder(label: "Public IP Address", emote: Emoji.Parse(":globe_with_meridians:"), style: ButtonStyle.Link,
-                                url: "https://letmegooglethat.com/?q=how+to+get+public+ip+address").Build())
-                                .AddComponent(new ButtonBuilder(label: "Check DNS Propagation", emote: Emoji.Parse(":globe_with_meridians:"), style: ButtonStyle.Link,
-                                url: "https://letmegooglethat.com/?q=dns+propagation+check").Build()))
-                            .AddRow(new ActionRowBuilder()
-                                .AddComponent(new ButtonBuilder(label: "Try Again", emote: Emoji.Parse(":repeat:"), style: ButtonStyle.Primary,
-                                customId: new CustomID { Source = customid.Source, Options = customid.Options }.Serialize()).Build()))
-                            .Build();
-                        });
-
-                        //await modal.FollowupAsync(text: errormsg, components: new ComponentBuilder()
-                        //    .AddRow(new ActionRowBuilder()
-                        //        .AddComponent(new ButtonBuilder(label: "Public IP Address", emote: Emoji.Parse(":globe_with_meridians:"), style: ButtonStyle.Link,
-                        //        url: "https://letmegooglethat.com/?q=how+to+get+public+ip+address").Build())
-                        //        .AddComponent(new ButtonBuilder(label: "Check DNS Propagation", emote: Emoji.Parse(":globe_with_meridians:"), style: ButtonStyle.Link,
-                        //        url: "https://letmegooglethat.com/?q=dns+propagation+check").Build()))
-                        //    .AddRow(new ActionRowBuilder()
-                        //        .AddComponent(new ButtonBuilder(label: "Try Again", emote: Emoji.Parse(":repeat:"), style: ButtonStyle.Primary,
-                        //        customId: new CustomID { Source = customid.Source, Options = customid.Options }.Serialize()).Build()))
-                        //    .Build(), ephemeral: true);
+                        Task.Delay(1000).Wait();
+                        placeholder.ModifyAsync(msg => msg.Content = $"*Now checking if the server is online... **{i}***").Wait();
                     }
-                    break;
-                default:
-                    break;
+                }, cancel.Token);
+
+                Task.WhenAny(checker, strer).Wait();
+                cancel.Cancel();
+
+                placeholder.ModifyAsync(msg =>
+                {
+                    msg.Content = "";
+                    msg.Embed = new GameServerEmbedBuilder(addresult.Result).Build();
+                }).Wait();
+            }
+            else
+            {
+                string errormsg = "";
+                switch (addresult.Exception.GetBaseException())
+                {
+                    case FormatException formexc:
+                        errormsg = $"Failed to add game server ***{(customid.Options["servername"] as string).Trim()}***, Game/RCON port number is not valid.";
+                        break;
+                    case InvalidOperationException invopexc:
+                        errormsg = $"Failed to find game server on `{host_ip}`, Make sure it is discoverable publicly and try again.";
+                        break;
+                    case AlreadyExistException existexc:
+                        errormsg = "Game server with the same Public IP and Port exist. Can't add the same server to watch list more than one instance.";
+                        break;
+                    default:
+                        errormsg = "Failed to add game server, Try again.";
+                        break;
+                }
+
+                Program.Log.Debug(errormsg);
+
+                customid.Options.Add("btn", "try-again");
+
+                placeholder.DeleteAsync().Wait();
+
+                modal.FollowupAsync(errormsg, components: new ComponentBuilder()
+                    .AddRow(new ActionRowBuilder()
+                        .AddComponent(new ButtonBuilder(label: "Public IP Address", emote: Emoji.Parse(":globe_with_meridians:"), style: ButtonStyle.Link,
+                        url: "https://letmegooglethat.com/?q=how+to+get+public+ip+address").Build())
+                        .AddComponent(new ButtonBuilder(label: "Check DNS Propagation", emote: Emoji.Parse(":globe_with_meridians:"), style: ButtonStyle.Link,
+                        url: "https://letmegooglethat.com/?q=dns+propagation+check").Build()))
+                    .AddRow(new ActionRowBuilder()
+                        .AddComponent(new ButtonBuilder(label: "Try Again", emote: Emoji.Parse(":repeat:"), style: ButtonStyle.Primary,
+                        customId: new CustomID{ Source = customid.Source, Options = customid.Options }.Serialize()).Build()))
+                    .Build(), ephemeral: true).Wait();
             }
         }
 
-        async Task ButtonExecuted(SocketMessageComponent arg)
+        #endregion
+
+        #region Button Handlers
+
+        private static void AddServerTryAgainHandler(SocketMessageComponent arg, CustomID customid)
         {
-            var customid = CustomID.Deserialize(arg.Data.CustomId);
-
-            switch (customid.Source)
+            if (customid.Options["btn"] as string == "try-again")
             {
-                case "addserver":
-                    if(customid.Options["btn"] as string == "try-again")
-                    {
-                        Program.Log.Debug($"User {arg.User} requested retry...");
-                        await arg.RespondWithModalAsync((await new AddServerModalBuilder().Get(customid.Options["servername"] as string)).Build());
-                    }
-                    break;
-                default:
-                    break;
+                Program.Log.Debug($"User {arg.User} requested retry...");
+                var name = (customid.Options["servername"] as string).Trim();
+                arg.RespondWithModalAsync(new AddServerModalBuilder(name).Build()).Wait();
             }
         }
+
+        #endregion
 
     }
 }
