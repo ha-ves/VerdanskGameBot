@@ -8,29 +8,32 @@ namespace VerdanskGameBot
 {
     internal class GameServerEmbedBuilder : EmbedBuilder
     {
-        internal Task<GameServerEmbedBuilder> Get(GameServerModel server)
+        internal GameServerEmbedBuilder(GameServerModel server)
         {
-            WithTitle(server.DisplayName);
-            WithDescription(server.Description);
-            if (server.ImageUrl != "")
-                WithImageUrl(server.ImageUrl);
-            else
-                WithImageUrl("");
+            WithTitle(string.IsNullOrEmpty(server.DisplayName) ? "--Untitled Game Server--" : server.DisplayName);
+            WithDescription((string.IsNullOrEmpty(server.Description) ? "--Game server has no description, could be any game server available out there.--" : server.Description));
+            WithThumbnailUrl(string.IsNullOrEmpty(server.ImageUrl) ? "https://cdn.discordapp.com/icons/790540532714831882/7449dcd6aded699bdbdec4718f66b6c8.webp" : server.ImageUrl);
+            var rand = new Random((int)(DateTimeOffset.Now - server.AddedSince).Ticks);
+            WithColor(new Color(rand.Next(255), rand.Next(255), rand.Next(255)));
 
             AddField(server.IsOnline ? ":green_circle: Online" : ":red_circle: Offline", server.IsOnline ? "Server is Online" : $"Last online : "
                     + (server.LastOnline > DateTimeOffset.MinValue ?
                     server.LastOnline.ToString() + $"*({GetLastTime(DateTimeOffset.Now - server.LastOnline)})*\r\n" : "Never")
-                );
+                , true);
             AddField("IP Address", server.IP.ToString(), true);
             AddField("Game Port", server.GamePort.ToString(), true);
+            
+            AddField("Game Link", string.IsNullOrEmpty(server.GameLink) ? "--Server don't provide game link.--" : server.GameLink, true);
 
-            WithFooter($"Last checked {GetLastTime(DateTimeOffset.Now - server.LastUpdate)}\r\n");
+            AddField("RTT (Ping) | Players", $"{server.RTT} ms | {server.Players}/{server.MaxPlayers}", true);
+
+            AddField("NOTE", string.IsNullOrEmpty(server.Note) ? "--Empty--" : server.Note);
+
+            WithFooter($"Last checked ->\r\n");
             WithCurrentTimestamp();
-
-            return Task.FromResult(this);
         }
 
-        private string GetLastTime(TimeSpan time)
+        private static string GetLastTime(TimeSpan time)
         {
             var str = "";
             str += time.Days > 0 ? $"{time.Days} days " : "";

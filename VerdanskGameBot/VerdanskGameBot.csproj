@@ -3,14 +3,19 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net5.0</TargetFramework>
+    <UserSecretsId>79540f67-cfd6-4338-857a-f37c08a32dec</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="BotConfig.json" />
     <None Remove="gameservers.db" />
     <None Remove="NLog.config" />
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="BotConfig.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="gameservers.db">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -22,6 +27,7 @@
   <ItemGroup>
     <PackageReference Include="Discord.Net" Version="3.4.1" />
     <PackageReference Include="DnsClient" Version="1.6.0" />
+    <PackageReference Include="Jering.Javascript.NodeJS" Version="6.3.0" />
     <PackageReference Include="MessagePack" Version="2.3.85" />
     <PackageReference Include="MessagePackAnalyzer" Version="2.3.85" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="5.0.15" />
@@ -30,8 +36,15 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="5.0.0" />
     <PackageReference Include="NLog" Version="4.7.14" />
     <PackageReference Include="RconSharp" Version="2.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Properties\launchSettings.json">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
