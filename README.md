@@ -1,9 +1,36 @@
 
 # Verdansk Game Bot — A Game Server Watcher Discord Bot
 
-This is a discord bot to watch your game server by utilizing [node-gamedig](https://github.com/gamedig/node-gamedig). This bot is written in [.NET (dotnet)](https://dotnet.microsoft.com/) for cross-platform and __multi-threaded environment__ because it will watch many game servers. Game servers are stored in an SQLite database using [Entity Framework (EF) Core](https://docs.microsoft.com/en-us/ef/core/).
+This is a discord bot to watch your game server by utilizing [node-gamedig](https://github.com/gamedig/node-gamedig) and [Discord.NET](https://github.com/discord-net/Discord.Net/). It will report the game server status in a text channel. This bot is written in [.NET (dotnet)](https://dotnet.microsoft.com/) for cross-platform and __multi-threaded environment__ because it will watch many game servers. Game servers are stored in an SQLite database using [Entity Framework (EF) Core](https://docs.microsoft.com/en-us/ef/core/).
 
-## Usage/Examples
+- [Features](README#features)
+- [Limitations](README#limitations)
+- [Future](README#future)
+- [Getting Started](README#getting-started)
+  - [Install NodeJS and gamedig](README#install-nodejs-and-gamedig),
+  - [Get a discord bot token](README#get-discord-bot-token),
+  - [Invite the bot to your discord server](README#invite-the-discord-bot),
+  - [Run the bot in service mode](README#run-the-bot-in-service-mode-linux-only).
+
+## Features
+
+### 1. Can watch multiple game servers provided it is supported by Gamedig,
+### 2. Shows game server properties in a text channel,
+### 3. Provides click to join game server for convenience,
+
+## Limitations
+
+### Many-many limits, I only tested this for Project Zomboid Steam Server.
+
+## Future
+
+I'm currently still in active study and can't actively improve this bot. Please contact me if you want to bring improvement to this bot.
+
+There are some improvements currently in mind :
+- Add more customizability for different games that reports different properties.
+- Add more interactability for server status message.
+
+## Getting Started
 
 This discord bot is self-hosted solution meaning this bot is run by you usually in a Virtual Private Server. _It will support container-based system in the future._
 
@@ -21,12 +48,12 @@ If you want step-by-step instruction to run this bot :
 	- Use LTS or Latest versions depending on your other dependent app.
 
 #### Install Gamedig Locally
-2. Run `npm install gamedig` in terminal/command prompt on the same folder of the bot executable `VerdanskGameBot.exe`.
+2. Run `npm install gamedig` in terminal/command prompt in the same directory of the bot executable `VerdanskGameBot.exe`.
 
 #### -Or- Install Gamedig Globally
-2. Run `npm install gamedig -g` in terminal/command prompt to install on global folder,
-3. Run `npm list -g` in terminal/command prompt to find where your global folder is,
-4. Edit your environment variable `NODE_PATH` to your global folder,
+2. Run `npm install gamedig -g` in terminal/command prompt to install on global directory,
+3. Run `npm list -g` in terminal/command prompt to find where your global directory is,
+4. Edit your environment variable `NODE_PATH` to your global directory,
 	- on Linux this is usually `/usr/local/lib`
 	- on Windows this is usually `%APPDATA%\npm`
 	- [How to edit your environment variable](https://www.google.com/search?q=how+to+edit+environment+variable)
@@ -44,10 +71,11 @@ If you want step-by-step instruction to run this bot :
 	- Send Messages
 
 2. Copy and visit the **Generated URL** in your browser to invite the bot to your server.
+![Invite Bot To Server](https://www.tekat.my.id/wp-content/uploads/2022/04/invite-bot-to-server.jpg)
 
 ## Run The Bot in Service Mode (Linux Only)
 
-1. Create a new file in `/etc/systemd/system` named `gameserverwatcher.service` or anything you'd like,
+1. Create a new file in `/etc/systemd/system` named `gameserverwatcher.service` or anything you'd like, remember this as `THE_BOT_SERVICE_NAME`,
 2. Add : 
 ```
 [Unit]
@@ -56,8 +84,8 @@ After=network.target
 
 [Service]
 User=YOUR_USER
-WorkingDirectory=VERDANSKGAMEBOT_FOLDER
-ExecStart=VERDANSKGAMEBOT_FOLDER/VerdanskGameBot
+WorkingDirectory=BOT_DIRECTORY
+ExecStart=BOT_DIRECTORY/VerdanskGameBot
 KillSignal=SIGINT
 
 [Install]
@@ -68,4 +96,14 @@ Where :
 |--|--|--|
 |`YOURBOT_DESCRIPTION`|the description of the bot|`Verdansk Game Server Watcher Bot`|
 |`YOUR_USER`|is the user you want to run this bot as, you can delete this line if not needed.|`steam`|
-|`VERDANSKGAMEBOT_FOLDER`|is the folder where you put the bot executable|`/home/steam/VerdanskGameBot`|
+|`BOT_DIRECTORY`|is the directory where you put the bot executable|`/home/steam/VerdanskGameBot`|
+3. Save the service file and Run `sudo systemctl daemon-reload` to reload any service file changes for systemd,
+4. Run `sudo systemctl enable THE_BOT_SERVICE_NAME` and `sudo systemctl start THE_BOT_SERVICE_NAME`
+5. Monitor the service using any monitoring tools you like.
+
+## What's Next?
+### Visit the Wiki page to see what you can do with this Bot.
+#### To Summarize, you can :
+1. Customize Bot from Discord Developer Portal,
+2. Customize how the server status is displayed,
+3. 

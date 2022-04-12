@@ -199,7 +199,7 @@ namespace VerdanskGameBot
             BotClient.Log += ClientLog;
             BotClient.Ready += OnBotReady;
 
-            BotClient.SetActivityAsync(new Game("\r\nRefugees", ActivityType.Watching)).Wait();
+            BotClient.SetActivityAsync(new Game("Refugees", ActivityType.Watching)).Wait();
             BotClient.LoginAsync(TokenType.Bot, token).Wait();
             BotClient.StartAsync().Wait();
         }

@@ -223,8 +223,8 @@ namespace VerdanskGameBot
                 if (db.GameServers.Any(server => server.ServerName == servername))
                 {
                     Program.Log.Warn($"{servername} already exist in watch list database. Not added.");
-                    cmd.RespondAsync($"Failed to add game server because\r\n" +
-                        $"servername : `{servername}`\r\n" +
+                    cmd.RespondAsync($"Failed to add game server because{Environment.NewLine}" +
+                        $"servername : `{servername}`{Environment.NewLine}" +
                         $"already exist in watch list.", ephemeral: true).Wait();
                     return;
                 }
@@ -232,7 +232,7 @@ namespace VerdanskGameBot
 
             if (!servername.All(ch => char.IsLetterOrDigit(ch) && char.IsLower(ch)) || servername.Length > 22)
             {
-                cmd.RespondAsync($"***servername*** : `{servername}` is invalid.\r\n" +
+                cmd.RespondAsync($"***servername*** : `{servername}` is invalid.{Environment.NewLine}" +
                     "Servername must be alphabets only (a-z) without whitespaces and up to 22 letters",
                     ephemeral: true).Wait();
                 return;

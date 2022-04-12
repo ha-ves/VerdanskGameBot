@@ -91,7 +91,7 @@ namespace VerdanskGameBot
             }
             catch (Exception exc)
             {
-                Program.Log.Trace(exc, $"Failed updating game server with name {{ {gameserver.ServerName} }}\r\n" +
+                Program.Log.Trace(exc, $"Failed updating game server with name {{ {gameserver.ServerName} }}{Environment.NewLine}" +
                     $"Exception : {exc}");
                 return;
             }
@@ -118,7 +118,7 @@ namespace VerdanskGameBot
                     var doc = new HtmlWeb().Load(page);
 
                     gameserver.Description = doc.DocumentNode.SelectSingleNode("//div[@class='game_description_snippet']").InnerText.Substring(0, 200).Trim() +
-                        "...\n" + page;
+                        $"...{Environment.NewLine}" + page;
                 }
             }
             
