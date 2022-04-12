@@ -1,14 +1,18 @@
 ﻿using Discord;
 using Discord.WebSocket;
 using DnsClient;
-using RconSharp;
+using HtmlAgilityPack;
+using Jering.Javascript.NodeJS;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -18,8 +22,10 @@ namespace VerdanskGameBot
 {
     internal class GameServerWatcher
     {
-        private static Dictionary<GameServerModel, Timer> Watchers;
+        private static Dictionary<string, Timer> Watchers;
         private static Timer GlobalTimer;
+
+        private static Mutex UpdateMutex = new Mutex(false);
 
         // Run on Bot thread (SHOULD NOT BLOCK)
         internal static void StartWatcher() { try { Task.Run(() => QueryGameServersToWatch(), Program.ExitCancel.Token); } catch { return; } }
@@ -28,22 +34,31 @@ namespace VerdanskGameBot
         {
             Program.Log.Debug("Starting Game Server Watchers.");
 
-            Watchers = new Dictionary<GameServerModel, Timer>();
+            if (!File.Exists("gameservers.db"))
+            {
+                Program.Log.Debug("No gameservers sqlite database file found. Creating one...");
+                var file = File.Create("gameservers.db");
+                Assembly.GetExecutingAssembly().GetManifestResourceStream(typeof(GameServerWatcher), "gameservers.db").CopyToAsync(file).Wait();
+                file.Close();
+                Program.Log.Debug("Created gameservers sqlite database file with default values.");
+            }
+
+            Watchers = new Dictionary<string, Timer>();
 
             using (var db = new GameServersDb())
             {
                 Parallel.ForEach(db.GameServers, gameServer =>
                 {
                     var timetoupdate = (gameServer.LastUpdate + gameServer.UpdateInterval) - DateTimeOffset.Now;
-                    Watchers.Add(gameServer, new Timer(callback: WatcherTimer_Elapsed, state: gameServer,
+                    Watchers.Add(gameServer.ServerName, new Timer(callback: WatcherTimer_Elapsed, state: gameServer,
                         dueTime: timetoupdate <= TimeSpan.Zero ? TimeSpan.Zero : timetoupdate, period: gameServer.UpdateInterval));
-                    Program.Log.Trace($"Started watcher for game server {{ {gameServer.ServerName} }}.");
+                    Program.Log.Trace($"Started watcher for game server {{ {gameServer.ServerName} }} | next update in {timetoupdate.TotalSeconds} s.");
                 });
             }
 
             Program.Log.Debug("Game server watchers Started.");
 
-            GlobalTimer = new Timer(dueTime: TimeSpan.Zero, period: TimeSpan.FromMinutes(15), state: null, callback: (obj) =>
+            GlobalTimer = new Timer(dueTime: TimeSpan.Zero, period: TimeSpan.FromHours(1), state: null, callback: (obj) =>
             {
                 Program.Log.Info($"Currently watching {Watchers.Count} game servers.");
             });
@@ -55,80 +70,83 @@ namespace VerdanskGameBot
 
         private static void UpdateGameServerStatus(GameServerModel gameserver)
         {
-#if DEBUG
-            Program.Log.Trace($"Updating game server {gameserver.ServerName}");
-#endif
+            if(!UpdateMutex.WaitOne(0)) return;
+
+            Program.Log.Trace($"Updating game server {{ {gameserver.ServerName} }}");
+
             using (var db = new GameServersDb())
                 gameserver = db.GameServers.First(gs => gs.Id == gameserver.Id);
 
             gameserver.LastUpdate = DateTimeOffset.Now;
 
-            var pong = new Ping().Send(gameserver.RconIP, 1000);
-            for (int i = 0; i < 10; i++)
+            JsonDocument gamedig;
+            try
             {
-                if (pong.Status == IPStatus.Success)
-                {
-                    gameserver.RTT = (ushort)(pong.RoundtripTime * 2);
-                    break;
-                }
-                pong = new Ping().Send(gameserver.RconIP, 1000);
+                gamedig = JsonDocument.Parse(StaticNodeJSService.InvokeFromStreamAsync<string>(
+                    Assembly.GetExecutingAssembly().GetManifestResourceStream(typeof(GameServerWatcher), "query.js"),
+                    args: new string[] { gameserver.GameType, gameserver.GamePort.ToString() }).Result);
+            }
+            catch (Exception exc)
+            {
+                Program.Log.Trace(exc, $"Failed updating game server with name {{ {gameserver.ServerName} }}\r\n" +
+                    $"Exception : {exc}");
+                return;
             }
 
-            if (pong.Status != IPStatus.Success && gameserver.IsOnline)
-            {
+            JsonElement check;
+            if (!gamedig.RootElement.TryGetProperty("name", out check))
                 gameserver.IsOnline = false;
-                gameserver.ErrMsg = "Server is not reachable from the internet.";
-            }
             else
             {
-                try
+                gameserver.IsOnline = true;
+                gameserver.LastOnline = DateTimeOffset.Now;
+
+                gameserver.DisplayName = gamedig.RootElement.GetProperty("name").GetString();
+                gameserver.Players = (byte)gamedig.RootElement.GetProperty("players").GetArrayLength();
+                gameserver.MaxPlayers = gamedig.RootElement.GetProperty("maxplayers").GetByte();
+
+                using (var http = new HttpClient())
                 {
-                    var rcon = RconClient.Create(gameserver.RconIP.ToString(), gameserver.RconPort);
+                    var appid = gamedig.RootElement.GetProperty("raw").GetProperty("appId").GetInt32();
 
-                    if (!rcon.ConnectAsync().IsCompletedSuccessfully)
-                    {
-                        gameserver.IsOnline = false;
-                        gameserver.ErrMsg = "Can't connect to RCON";
-                    }
-                    else
-                    {
-                        if (!rcon.AuthenticateAsync(gameserver.RconPass).Result)
-                            gameserver.ErrMsg = "Failed authenticating to RCON server";
-                        else
-                        {
-                            var res = rcon.ExecuteCommandAsync("showoptions").Result;
-                            gameserver.MaxPlayers = byte.Parse(res.Substring(res.IndexOf("MaxPlayers=") + 11, 2));
+                    gameserver.ImageUrl = $"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg";
+                    var page = $"https://store.steampowered.com/app/{appid}/";
 
-                            res = rcon.ExecuteCommandAsync("players").Result;
-                            gameserver.Players = byte.Parse(res.Substring(res.IndexOf("Players connected") + 18, 4).Trim(':'), System.Globalization.NumberStyles.AllowParentheses);
-                        }
+                    var doc = new HtmlWeb().Load(page);
 
-                        rcon.Disconnect();
-
-                        gameserver.IsOnline = true;
-                        gameserver.LastOnline = DateTimeOffset.Now;
-                        gameserver.ErrMsg = "";
-                    }
-                }
-                catch (Exception ex)
-                {
-                    gameserver.IsOnline = false;
-                    gameserver.ErrMsg = "Failed to get server informations. (RCON)";
-                    Program.Log.Trace(ex.Message);
+                    gameserver.Description = doc.DocumentNode.SelectSingleNode("//div[@class='game_description_snippet']").InnerText.Substring(0, 200).Trim() +
+                        "...\n" + page;
                 }
             }
-
-#if DEBUG
-            Program.Log.Trace(string.IsNullOrEmpty(gameserver.ErrMsg) ? "Server is Online and Available to join." : gameserver.ErrMsg);
-#endif
-
+            
             using (var db = new GameServersDb())
             {
                 db.Update(gameserver);
                 db.SaveChanges();
             }
 
-            CommandService.UpdateGameServerStatusMessage(Program.BotClient, gameserver);  
+            CommandService.UpdateGameServerStatusMessage(Program.BotClient, gameserver);
+
+            UpdateMutex.ReleaseMutex();
+
+            Program.Log.Trace($"Game server with name {{ {gameserver.ServerName} }} updated.");
+        }
+
+        internal static bool PauseUpdate(GameServerModel gameServer)
+        {
+            Watchers[gameServer.ServerName].Change(Timeout.Infinite, Timeout.Infinite);
+
+            if (UpdateMutex.WaitOne(3000)) return true;
+            else return false;
+        }
+
+        internal static void ResumeUpdate(GameServerModel gameServer)
+        {
+            UpdateMutex.ReleaseMutex();
+
+            var timetoupdate = (gameServer.LastUpdate + gameServer.UpdateInterval) - DateTimeOffset.Now;
+
+            Watchers[gameServer.ServerName].Change(dueTime: timetoupdate <= TimeSpan.Zero ? TimeSpan.Zero : timetoupdate, period: gameServer.UpdateInterval);
         }
 
         #endregion
@@ -139,16 +157,15 @@ namespace VerdanskGameBot
         {
             var customid = CustomID.Deserialize(modal.Data.CustomId);
 
+            string gametype = modal.Data.Components.First(cmp => cmp.CustomId == "gametype").Value;
             string host_ip = modal.Data.Components.First(cmp => cmp.CustomId == "host_ip").Value;
-            IPAddress ip;
-            ushort rconport, gameport;
+            IPAddress ip; ushort gameport;
 
             Program.Log.Debug($"Resolving hostname \"{host_ip}\" ...");
             try
             {
                 ip = new LookupClient(new[]{ NameServer.Cloudflare, NameServer.Cloudflare2 }).QueryAsync(host_ip, QueryType.A).Result.Answers.AddressRecords().FirstOrDefault().Address;
                 gameport = ushort.Parse(modal.Data.Components.FirstOrDefault(cmp => cmp.CustomId == "game_port").Value);
-                rconport = ushort.Parse(modal.Data.Components.FirstOrDefault(cmp => cmp.CustomId == "rcon_port").Value);
             }
             catch (InvalidOperationException invopexc)
             {
@@ -174,6 +191,7 @@ namespace VerdanskGameBot
             var gameserver = new GameServerModel
             {
                 ServerName = (customid.Options["servername"] as string).Trim(),
+                GameType = gametype,
                 IsOnline = false,
                 LastOnline = DateTimeOffset.UnixEpoch,
                 AddedBy = modal.User.Id,
@@ -181,9 +199,7 @@ namespace VerdanskGameBot
                 MessageId = placeholder.Id,
                 IP = ip,
                 GamePort = gameport,
-                RconIP = ip,
-                RconPort = rconport,
-                RconPass = modal.Data.Components.First(cmp => cmp.CustomId == "rcon_pass").Value,
+                GameLink = $"steam://connect/{ip}:{gameport}",
                 AddedSince = DateTimeOffset.Now,
                 LastUpdate = DateTimeOffset.UnixEpoch,
                 UpdateInterval = TimeSpan.FromSeconds(10),
@@ -191,7 +207,7 @@ namespace VerdanskGameBot
 
             using (var db = new GameServersDb())
             {
-                if (db.GameServers.Any(server => server.IP == ip && server.RconPort == rconport))
+                if (db.GameServers.Any(server => server.IP == ip && server.GamePort == gameport))
                 {
                     var existexc = new AlreadyExistException();
                     Program.Log.Debug(existexc, "Server with the same Public IP and Port exist. Can't add the same server to watch list more than one instance.");
@@ -212,13 +228,13 @@ namespace VerdanskGameBot
                 Program.Log.Debug($"Added a game server to database.");
             }
 
-            Watchers.Add(gameserver, new Timer(callback: WatcherTimer_Elapsed, state: gameserver, dueTime: TimeSpan.Zero, period: gameserver.UpdateInterval));
+            Watchers.Add(gameserver.ServerName, new Timer(callback: WatcherTimer_Elapsed, state: gameserver, dueTime: TimeSpan.Zero, period: gameserver.UpdateInterval));
             GlobalTimer.Change(TimeSpan.Zero, TimeSpan.FromMinutes(15));
 
             return Task.FromResult(gameserver);
         }
 
-        internal static void RemoveWatcher(GameServerModel theserver) => Watchers[theserver].Dispose();
+        internal static void RemoveWatcher(GameServerModel theserver) => Watchers[theserver.ServerName].Dispose();
 
         public static async void Dispose()
         {

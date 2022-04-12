@@ -11,8 +11,14 @@ namespace VerdanskGameBot
         /// <summary>
         /// Primary Key
         /// </summary>
-        [Key, Column("id", Order = 0)]
+        [Key, Column("id")]
         public ulong Id { get; set; }
+
+        /// <summary>
+        /// Game Type
+        /// </summary>
+        [Column("type"), MaxLength(22)]
+        public string GameType { get; set; }
 
         /// <summary>
         /// Private server name (by Admin)
@@ -22,26 +28,26 @@ namespace VerdanskGameBot
         /// <summary>
         /// Display Name to show on watch list
         /// </summary>
-        [Column("display_name"), MaxLength(100)]
+        [NotMapped]
         public string DisplayName { get; set; }
 
         /// <summary>
         /// Description of game server
         /// </summary>
-        [Column("desc"), MaxLength(200)]
+        [NotMapped]
         public string Description { get; set; }
 
         /// <summary>
         /// Image URL to show on watch list
         /// </summary>
-        [Column("img_url"), MaxLength(200)]
+        [NotMapped]
         public string ImageUrl { get; set; }
 
         /// <summary>
         /// Is the server online?
         /// </summary>
         [NotMapped]
-        public bool IsOnline { get; set; }
+        public bool IsOnline { get; set; } = false;
         /// <summary>
         /// Last time the server is online
         /// </summary>
@@ -53,12 +59,6 @@ namespace VerdanskGameBot
         /// </summary>
         [Column("game_link"), MaxLength(100)]
         public string GameLink { get; set; }
-
-        /// <summary>
-        /// Round-trip-time
-        /// </summary>
-        [NotMapped]
-        public ushort RTT { get; set; }
 
         /// <summary>
         /// Current number of players in game server
@@ -93,30 +93,11 @@ namespace VerdanskGameBot
         /// </summary>
         [Required, Column("game_ip")]
         public IPAddress IP { get; set; }
-
         /// <summary>
         /// Port to join the game server
         /// </summary>
         [Required, Column("game_port")]
         public ushort GamePort { get; set; }
-
-        /// <summary>
-        /// RCON IP
-        /// </summary>
-        [Required, Column("rcon_ip")]
-        public IPAddress RconIP { get; set; }
-
-        /// <summary>
-        /// Port to administer the server (RCON)
-        /// </summary>
-        [Required, Column("rcon_port")]
-        public ushort RconPort { get; set; }
-
-        /// <summary>
-        /// Plain-text password for RCON
-        /// </summary>
-        [Required, Column("rcon_pass")]
-        public string RconPass { get; set; }
 
         /// <summary>
         /// Date the game server added

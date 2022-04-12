@@ -14,6 +14,18 @@ namespace VerdanskGameBot
                 Source = "addserver",
                 Options = new Dictionary<string, object> { { "servername", servername + " " } }
             }.Serialize());
+
+            AddComponents(new List<IMessageComponent>
+            {
+                new TextInputBuilder()
+                {
+                    CustomId = "gametype",
+                    Label = "Game Type",
+                    Placeholder = "i.e. przomboid",
+                    Required = true,
+                    Style = TextInputStyle.Short
+                }.Build()
+            }, 0);
             AddComponents(new List<IMessageComponent>
             {
                 new TextInputBuilder()
@@ -32,28 +44,6 @@ namespace VerdanskGameBot
                     CustomId = "game_port",
                     Label = "Port to join server (Game)",
                     Placeholder = "i.e. 12727",
-                    Required = true,
-                    Style = TextInputStyle.Short
-                }.Build()
-            }, 0);
-            AddComponents(new List<IMessageComponent>
-            {
-                new TextInputBuilder
-                {
-                    CustomId = "rcon_port",
-                    Label = "Port to check server (RCON)",
-                    Placeholder = "i.e. 27015",
-                    Required = true,
-                    Style = TextInputStyle.Short
-                }.Build()
-            }, 0);
-            AddComponents(new List<IMessageComponent>
-            {
-                new TextInputBuilder
-                {
-                    CustomId = "rcon_pass",
-                    Label = "Password to check server (RCON)",
-                    Placeholder = "i.e. yousux",
                     Required = true,
                     Style = TextInputStyle.Short
                 }.Build()
