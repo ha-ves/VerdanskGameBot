@@ -36,7 +36,8 @@ If you want step-by-step instruction to run this bot :
 1. Head to [Discord Developer Portal](https://discord.com/developers/applications), login your discord account, and create your application,
 2. Once your discord _application_'s created, head to **SETTINGS** > **Bot** and Add a new bot,  
 3. **Reset Token** to get a new Bot Token, save this token in private,
-![enter image description here](https://www.tekat.my.id/wp-content/uploads/2022/04/get-bot-token.png)
+![Get Discord Bot Token](https://www.tekat.my.id/wp-content/uploads/2022/04/get-bot-token.png)
+
 ## Invite The Discord Bot
 
 1. Head back to your discord developer application and go to **SETTINGS** > **OAuth2** > **URL Generator**. Check to use the **Scopes** of `bot` with **Bot Permissions** :
