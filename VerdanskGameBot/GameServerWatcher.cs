@@ -60,6 +60,9 @@ namespace VerdanskGameBot
 
             GlobalTimer = new Timer(dueTime: TimeSpan.Zero, period: TimeSpan.FromHours(1), state: null, callback: (obj) =>
             {
+                if (Program.BotClient.ConnectionState == ConnectionState.Disconnected)
+                    Environment.Exit(-500);
+
                 Program.Log.Info($"Currently watching {Watchers.Count} game servers.");
             });
         }
