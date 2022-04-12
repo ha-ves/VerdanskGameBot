@@ -64,6 +64,8 @@ If you want step-by-step instruction to run this bot :
 2. Once your discord _application_'s created, head to **SETTINGS** > **Bot** and Add a new bot,  
 3. **Reset Token** to get a new Bot Token, save this token in private,
 ![Get Discord Bot Token](https://www.tekat.my.id/wp-content/uploads/2022/04/get-discord-bot-token.png)
+4. Run the bot if you haven't. It will ask for a `BotToken` inside a file named `BotConfig.json`,
+5. Put the Bot Token enclosed in double-quote `""`
 
 ## Invite The Discord Bot
 
@@ -100,10 +102,3 @@ Where :
 3. Save the service file and Run `sudo systemctl daemon-reload` to reload any service file changes for systemd,
 4. Run `sudo systemctl enable THE_BOT_SERVICE_NAME` and `sudo systemctl start THE_BOT_SERVICE_NAME`
 5. Monitor the service using any monitoring tools you like.
-
-## What's Next?
-### Visit the Wiki page to see what you can do with this Bot.
-#### To Summarize, you can :
-1. Customize Bot from Discord Developer Portal,
-2. Customize how the server status is displayed,
-3. 

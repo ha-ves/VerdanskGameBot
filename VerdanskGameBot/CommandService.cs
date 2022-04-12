@@ -32,11 +32,13 @@ namespace VerdanskGameBot
         {
             Program.Log.Debug("Posting commands to guild.");
 
-            //var guild = bot.Guilds.Where(guild => guild.Id == 790540532714831882).First();
             var guild = bot.Guilds.First();
 
             if (guild == null)
+            {
                 Program.Log.Fatal("This bot is not invited to any discord server yet. Invite to your server first.");
+                Environment.Exit(-500);
+            }
 
             try
             {

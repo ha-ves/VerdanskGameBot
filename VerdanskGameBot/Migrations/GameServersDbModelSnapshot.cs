@@ -53,11 +53,6 @@ namespace VerdanskGameBot.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("game_ip");
 
-                    b.Property<string>("ImageUrl")
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("img_url");
-
                     b.Property<long>("LastOnline")
                         .HasColumnType("INTEGER")
                         .HasColumnName("last_online_time");

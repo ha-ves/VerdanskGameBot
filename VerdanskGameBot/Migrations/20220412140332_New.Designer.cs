@@ -8,8 +8,8 @@ using VerdanskGameBot;
 namespace VerdanskGameBot.Migrations
 {
     [DbContext(typeof(GameServersDb))]
-    [Migration("20220321005639_FixProps")]
-    partial class FixProps
+    [Migration("20220412140332_New")]
+    partial class New
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -36,16 +36,6 @@ namespace VerdanskGameBot.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("chan_id");
 
-                    b.Property<string>("Description")
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("desc");
-
-                    b.Property<string>("DisplayName")
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("display_name");
-
                     b.Property<string>("GameLink")
                         .HasMaxLength(100)
                         .HasColumnType("TEXT")
@@ -55,21 +45,15 @@ namespace VerdanskGameBot.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("game_port");
 
+                    b.Property<string>("GameType")
+                        .HasMaxLength(22)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("type");
+
                     b.Property<string>("IP")
                         .IsRequired()
                         .HasColumnType("TEXT")
                         .HasColumnName("game_ip");
-
-                    b.Property<string>("ImageUrl")
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT")
-                        .HasColumnName("img_url");
-
-                    b.Property<bool>("IsOnline")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_online");
 
                     b.Property<long>("LastOnline")
                         .HasColumnType("INTEGER")
@@ -86,20 +70,6 @@ namespace VerdanskGameBot.Migrations
                     b.Property<string>("Note")
                         .HasColumnType("TEXT")
                         .HasColumnName("note");
-
-                    b.Property<string>("RconIP")
-                        .IsRequired()
-                        .HasColumnType("TEXT")
-                        .HasColumnName("rcon_ip");
-
-                    b.Property<string>("RconPass")
-                        .IsRequired()
-                        .HasColumnType("TEXT")
-                        .HasColumnName("rcon_pass");
-
-                    b.Property<ushort>("RconPort")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("rcon_port");
 
                     b.Property<string>("ServerName")
                         .IsRequired()
