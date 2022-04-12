@@ -32,14 +32,18 @@ namespace VerdanskGameBot
         {
             Program.Log.Debug("Posting commands to guild.");
 
-            var verdansk = bot.Guilds.Where(guild => guild.Id == 790540532714831882).First();
+            //var guild = bot.Guilds.Where(guild => guild.Id == 790540532714831882).First();
+            var guild = bot.Guilds.First();
+
+            if (guild == null)
+                Program.Log.Fatal("This bot is not invited to any discord server yet. Invite to your server first.");
 
             try
             {
                 commands.ForEach(async cmd =>
                 {
-                    await verdansk.BulkOverwriteApplicationCommandAsync(new ApplicationCommandProperties[] { cmd.Build() });
-                    Program.Log.Trace($"/{cmd.Name} command posted to {verdansk}");
+                    await guild.BulkOverwriteApplicationCommandAsync(new ApplicationCommandProperties[] { cmd.Build() });
+                    Program.Log.Trace($"/{cmd.Name} command posted to {guild}");
                 });
             }
             catch (Discord.Net.HttpException exc)
