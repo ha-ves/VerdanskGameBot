@@ -1,7 +1,7 @@
 
 # Verdansk Game Bot — A Game Server Watcher Discord Bot
 
-This is a discord bot to watch your game server by utilizing [node-gamedig](https://github.com/gamedig/node-gamedig). This bot is written in [.NET (dotnet)](https://dotnet.microsoft.com/) for __multi-threaded environment__ because it will watch many game servers. Game servers are stored in an SQLite database using [Entity Framework (EF) Core](https://docs.microsoft.com/en-us/ef/core/).
+This is a discord bot to watch your game server by utilizing [node-gamedig](https://github.com/gamedig/node-gamedig). This bot is written in [.NET (dotnet)](https://dotnet.microsoft.com/) for cross-platform and __multi-threaded environment__ because it will watch many game servers. Game servers are stored in an SQLite database using [Entity Framework (EF) Core](https://docs.microsoft.com/en-us/ef/core/).
 
 ## Usage/Examples
 
