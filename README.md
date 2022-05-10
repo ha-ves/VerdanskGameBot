@@ -3,14 +3,14 @@
 
 This is a discord bot to watch your game server by utilizing [node-gamedig](https://github.com/gamedig/node-gamedig) and [Discord.NET](https://github.com/discord-net/Discord.Net/). It will report the game server status in a text channel. This bot is written in [.NET (dotnet)](https://dotnet.microsoft.com/) for cross-platform and __multi-threaded environment__ because it will watch many game servers. Game servers are stored in an SQLite database using [Entity Framework (EF) Core](https://docs.microsoft.com/en-us/ef/core/).
 
-- [Features](README#features)
-- [Limitations](README#limitations)
-- [Future](README#future)
-- [Getting Started](README#getting-started)
-  - [Install NodeJS and gamedig](README#install-nodejs-and-gamedig),
-  - [Get a discord bot token](README#get-discord-bot-token),
-  - [Invite the bot to your discord server](README#invite-the-discord-bot),
-  - [Run the bot in service mode](README#run-the-bot-in-service-mode-linux-only).
+- [Features](README.md#features)
+- [Limitations](README.md#limitations)
+- [Future](README.md#future)
+- [Getting Started](README.md#getting-started)
+  - [Install NodeJS and gamedig](README.md#install-nodejs-and-gamedig),
+  - [Get a discord bot token](README.md#get-discord-bot-token),
+  - [Invite the bot to your discord server](README.md#invite-the-discord-bot),
+  - [Run the bot in service mode](README.md#run-the-bot-in-service-mode-linux-only).
 
 ## Features
 
@@ -37,10 +37,10 @@ This discord bot is self-hosted solution meaning this bot is run by you usually 
 ### To use this bot, download the [latest release](https://github.com/ha-ves/VerdanskGameBot/releases) and run the bot. Upon running it, it will perform checks and tell you what needs to be done.
 
 If you want step-by-step instruction to run this bot :
-1. [Install NodeJS and gamedig](README#install-nodejs-and-gamedig),
-2. [Get a discord bot token](README#get-discord-bot-token),
-3. [Invite the bot to your discord server](README#invite-the-discord-bot),
-4. [Run the bot in service mode](README#run-the-bot-in-service-mode-linux-only).
+1. [Install NodeJS and gamedig](README.md#install-nodejs-and-gamedig),
+2. [Get a discord bot token](README.md#get-discord-bot-token),
+3. [Invite the bot to your discord server](README.md#invite-the-discord-bot),
+4. [Run the bot in service mode](README.md#run-the-bot-in-service-mode-linux-only).
 
 ## Install NodeJS and Gamedig
 
