@@ -54,13 +54,21 @@ namespace VerdanskGameBot
             Console.CancelKeyPress += Console_SIGINT;
             AppDomain.CurrentDomain.ProcessExit += Process_SIGTERM;
 
-            while (true)
+            if (args.Length > 0 && args[0] == "service")
             {
-                var cmd = Console.ReadLine();
-                if (cmd == "exit")
+                Log.Debug("App IS NOT Console Interactive (system service)");
+                new ManualResetEvent(false).WaitOne();
+            }
+            else {
+                Log.Debug("App IS Console Interactive");
+                while (true)
                 {
-                    Console_SIGINT(null, null);
-                    break;
+                    var cmd = Console.ReadLine();
+                    if (cmd == "exit")
+                    {
+                        Console_SIGINT(null, null);
+                        break;
+                    }
                 }
             }
         }
