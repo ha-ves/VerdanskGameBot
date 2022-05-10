@@ -87,7 +87,7 @@ After=network.target
 [Service]
 User=YOUR_USER
 WorkingDirectory=BOT_DIRECTORY
-ExecStart=BOT_DIRECTORY/VerdanskGameBot
+ExecStart=BOT_DIRECTORY/VerdanskGameBot service
 KillSignal=SIGINT
 
 [Install]
