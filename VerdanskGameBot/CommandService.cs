@@ -63,7 +63,7 @@ namespace VerdanskGameBot
             chan.ModifyMessageAsync(gameserver.MessageId, msg =>
             {
                 msg.Content = "";
-                msg.Embeds = new[] { new GameServerEmbedBuilder(gameserver, chan.GetMessageAsync(gameserver.MessageId).Result.Embeds.First()).Build() };
+                msg.Embeds = new[] { new GameServerEmbedBuilder(gameserver, chan.GetMessageAsync(gameserver.MessageId).Result.Embeds.FirstOrDefault()).Build() };
             }).Wait();
 
             Program.Log.Trace($"Updated game server {{ {gameserver.ServerName} }}");
@@ -100,8 +100,11 @@ namespace VerdanskGameBot
 
                     switch (customid.Source)
                     {
-                        case "addserver":
+                        case CustomIDs.AddServerSource:
                             AddServerTryAgainHandler(arg, customid);
+                            break;
+                        case CustomIDs.ChangeServerSource:
+                            ChangeServerTryAgainHandler(arg, customid);
                             break;
                         default:
                             break;
@@ -123,8 +126,11 @@ namespace VerdanskGameBot
 
                     switch (customid.Source)
                     {
-                        case "addserver":
+                        case CustomIDs.AddServerSource:
                             AddServerModalSubmitHandler(modal);
+                            break;
+                        case CustomIDs.ChangeServerSource:
+                            ChangeServerModalSubmitHandler(modal);
                             break;
                         default:
                             break;
@@ -162,12 +168,30 @@ namespace VerdanskGameBot
                 case "remove":
                     GameServerRemovalHandler(bot, cmd, subcmd.Options);
                     break;
+                case "change":
+                    GameServerChangeHandler(cmd, subcmd.Options);
+                    break;
                 default:
                     cmd.RespondAsync("Command invalid.", ephemeral: true).Wait();
                     break;
             }
 
             Program.Log.Debug(cmd.HasResponded ? "^ Responded successfully." : "^ No response sent.");
+        }
+
+        private static void GameServerChangeHandler(SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
+        {
+            var servername = options.First().Value as string;
+
+            GameServerModel theserver;
+
+            using (var db = new GameServersDb())
+                theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == servername);
+
+            if (theserver == null)
+                cmd.RespondAsync($"There is no gameserver with name \"{servername}\". Please check the correct name.", ephemeral: true).Wait();
+
+            cmd.RespondWithModalAsync(new ChangeServerModalBuilder(theserver).Build()).Wait();
         }
 
         private static void GameServerListingHandler(SocketSlashCommand cmd)
@@ -245,9 +269,6 @@ namespace VerdanskGameBot
 
         private static void GameServerMoverHandler(DiscordSocketClient bot, SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
         {
-            cmd.RespondAsync($"**Moving game server with name `{options.First().Value}` to (<#{cmd.Channel.Id}>) ...**", ephemeral: true);
-            Program.Log.Debug($"**Moving game server with name `{options.First().Value}` to (<#{cmd.Channel.Id}>) ...**");
-
             GameServerModel theserver;
 
             using (var db = new GameServersDb())
@@ -258,6 +279,9 @@ namespace VerdanskGameBot
                 cmd.ModifyOriginalResponseAsync(msg => msg.Content = $"**No game server with name `{options.First().Value}` found. Try again.**").Wait();
                 Program.Log.Debug($"**No game server with name `{options.First().Value}` found. Try again.**");
             }
+
+            cmd.RespondAsync($"**Moving game server with name `{options.First().Value}` to (<#{cmd.Channel.Id}>) ...**", ephemeral: true);
+            Program.Log.Debug($"**Moving game server with name `{options.First().Value}` to (<#{cmd.Channel.Id}>) ...**");
 
             if (!GameServerWatcher.PauseUpdate(theserver))
             {
@@ -310,13 +334,69 @@ namespace VerdanskGameBot
 
         #region Modal Submit Handlers
 
-        private static void AddServerModalSubmitHandler(SocketModal modal)
+        private static void ChangeServerModalSubmitHandler(SocketModal modal)
         {
             var guild = (modal.Channel as SocketTextChannel).Guild;
             var components = modal.Data.Components;
 
             var customid = CustomID.Deserialize(modal.Data.CustomId);
-            string servername = (customid.Options["servername"] as string).Trim();
+            string servername = customid.Options[CustomIDs.ServernameOption];
+
+            Program.Log.Debug($"User {modal.User} requested to change game server \"{servername}\" for guild \"{guild}\"...");
+
+            modal.DeferAsync(ephemeral: true).Wait();
+
+            var changeresult = GameServerWatcher.ChangeGameServer(modal);
+
+            if (changeresult.IsCompletedSuccessfully)
+            {
+                Program.Log.Info($"User {{ {modal.User} }} Changed game server \"{servername}\" details for guild \"{guild}\".");
+
+                modal.FollowupAsync($"Changed game server \"{servername}\"'s details.").Wait();
+            }
+            else
+            {
+                string errormsg = "";
+                switch (changeresult.Exception.GetBaseException())
+                {
+                    case GamePortFormatException formexc:
+                        errormsg = $"Failed to add game server ***{servername}***, Game port number is not valid.";
+                        break;
+                    case UpdateIntervalFormatException formexc:
+                        errormsg = $"Failed to add game server ***{servername}***, Update interval is not valid.";
+                        break;
+                    case InvalidOperationException invopexc:
+                        errormsg = $"Failed to find game server on `{components.First(cmp => cmp.CustomId == CustomIDs.HostIPPort.ToString("d")).Value}`, Make sure it is discoverable publicly and try again.";
+                        break;
+                    default:
+                        errormsg = "Failed to change game server, Try again.";
+                        break;
+                }
+
+                Program.Log.Debug(errormsg);
+
+                customid.Options.Add(CustomIDs.ButtonOption, CustomIDs.TryAgainButton.ToString("d"));
+
+                modal.FollowupAsync(errormsg, components: new ComponentBuilder()
+                    .AddRow(new ActionRowBuilder()
+                        .AddComponent(new ButtonBuilder(label: "Public IP Address", emote: Emoji.Parse(":globe_with_meridians:"), style: ButtonStyle.Link,
+                        url: "https://letmegooglethat.com/?q=how+to+get+public+ip+address").Build())
+                        .AddComponent(new ButtonBuilder(label: "Check DNS Propagation", emote: Emoji.Parse(":globe_with_meridians:"), style: ButtonStyle.Link,
+                        url: "https://letmegooglethat.com/?q=dns+propagation+check").Build()))
+                    .AddRow(new ActionRowBuilder()
+                        .AddComponent(new ButtonBuilder(label: "Try Again", emote: Emoji.Parse(":repeat:"), style: ButtonStyle.Primary,
+                        customId: new CustomID { Source = customid.Source, Options = customid.Options }.Serialize()).Build()))
+                    .Build(), ephemeral: true).Wait();
+            }
+        }
+
+        private static async void AddServerModalSubmitHandler(SocketModal modal)
+        {
+            var guild = (modal.Channel as SocketTextChannel).Guild;
+            var components = modal.Data.Components;
+
+            var customid = CustomID.Deserialize(modal.Data.CustomId);
+            string servername = customid.Options[CustomIDs.ServernameOption];
 
             Program.Log.Debug($"User {modal.User} requested to add game server \"{servername}\" to watch list for guild \"{guild}\"...");
 
@@ -361,11 +441,14 @@ namespace VerdanskGameBot
                 string errormsg = "";
                 switch (addresult.Exception.GetBaseException())
                 {
-                    case FormatException formexc:
-                        errormsg = $"Failed to add game server ***{servername}***, Game/RCON port number is not valid.";
+                    case GamePortFormatException formexc:
+                        errormsg = $"Failed to add game server ***{servername}***, Game port number is not valid.";
+                        break;
+                    case UpdateIntervalFormatException formexc:
+                        errormsg = $"Failed to add game server ***{servername}***, Update interval is not valid.";
                         break;
                     case InvalidOperationException invopexc:
-                        errormsg = $"Failed to find game server on `{components.First(cmp => cmp.CustomId == "host_ip").Value}`, Make sure it is discoverable publicly and try again.";
+                        errormsg = $"Failed to find game server on `{components.First(cmp => cmp.CustomId == CustomIDs.HostIPPort.ToString("d")).Value}`, Make sure it is discoverable publicly and try again.";
                         break;
                     case AlreadyExistException existexc:
                         errormsg = "Game server with the same Public IP and Port exist. Can't add the same server to watch list more than one instance.";
@@ -377,7 +460,7 @@ namespace VerdanskGameBot
 
                 Program.Log.Debug(errormsg);
 
-                customid.Options.Add("btn", "try-again");
+                customid.Options.Add(CustomIDs.ButtonOption, CustomIDs.TryAgainButton.ToString("d"));
 
                 placeholder.DeleteAsync().Wait();
 
@@ -398,12 +481,27 @@ namespace VerdanskGameBot
 
         #region Button Handlers
 
-        private static void AddServerTryAgainHandler(SocketMessageComponent arg, CustomID customid)
+        private static void ChangeServerTryAgainHandler(SocketMessageComponent arg, CustomID customid)
         {
-            if (customid.Options["btn"] as string == "try-again")
+            if (customid.Options[CustomIDs.ButtonOption] == CustomIDs.TryAgainButton.ToString("d"))
             {
                 Program.Log.Debug($"User {arg.User} requested retry...");
-                var name = (customid.Options["servername"] as string).Trim();
+                
+                GameServerModel theserver;
+
+                using (var db = new GameServersDb())
+                    theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == customid.Options[CustomIDs.ServernameOption]);
+
+                arg.RespondWithModalAsync(new ChangeServerModalBuilder(theserver).Build()).Wait();
+            }
+        }
+
+        private static void AddServerTryAgainHandler(SocketMessageComponent arg, CustomID customid)
+        {
+            if (customid.Options[CustomIDs.ButtonOption] == CustomIDs.TryAgainButton.ToString("d"))
+            {
+                Program.Log.Debug($"User {arg.User} requested retry...");
+                var name = customid.Options[CustomIDs.ServernameOption];
                 arg.RespondWithModalAsync(new AddServerModalBuilder(name).Build()).Wait();
             }
         }

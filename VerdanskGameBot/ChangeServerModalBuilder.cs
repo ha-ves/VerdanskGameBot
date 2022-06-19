@@ -1,27 +1,31 @@
 ﻿using Discord;
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace VerdanskGameBot
 {
-    internal class AddServerModalBuilder : ModalBuilder
+    internal class ChangeServerModalBuilder : ModalBuilder
     {
-        internal AddServerModalBuilder(string servername)
+        internal ChangeServerModalBuilder(GameServerModel gameserver)
         {
-            WithTitle($"Add \"{servername}\" to watch list");
+            WithTitle($"Change \"{gameserver.ServerName}\" game server");
             WithCustomId(new CustomID
             {
-                Source = CustomIDs.AddServerSource,
-                Options = new Dictionary<CustomIDs, string> { { CustomIDs.ServernameOption, servername } }
+                Source = CustomIDs.ChangeServerSource,
+                Options = new Dictionary<CustomIDs, string> { { CustomIDs.ServernameOption, gameserver.ServerName } }
             }.Serialize());
 
             AddTextInput(new TextInputBuilder()
             {
                 CustomId = CustomIDs.GameType.ToString("d"),
                 Label = "Game Type",
-                Placeholder = "i.e. valve",
+                Placeholder = "i.e. przomboid",
                 Required = true,
-                Style = TextInputStyle.Short
+                Style = TextInputStyle.Short,
+                Value = gameserver.GameType
             });
 
             AddTextInput(new TextInputBuilder()
@@ -30,7 +34,8 @@ namespace VerdanskGameBot
                 Label = "Hostname/Public IP & Port",
                 Placeholder = "i.e. refuge.verdansk.net:5555 -or- 127.1.2.3:12727",
                 Required = true,
-                Style = TextInputStyle.Short
+                Style = TextInputStyle.Short,
+                Value = $"{gameserver.IP}:{gameserver.GamePort}"
             });
 
             AddTextInput(new TextInputBuilder
@@ -39,7 +44,8 @@ namespace VerdanskGameBot
                 Label = "Watch Update Interval (in Minutes)",
                 Placeholder = "i.e. 15",
                 Required = true,
-                Style = TextInputStyle.Short
+                Style = TextInputStyle.Short,
+                Value = gameserver.UpdateInterval.TotalMinutes.ToString()
             });
 
             AddTextInput(new TextInputBuilder
@@ -47,7 +53,8 @@ namespace VerdanskGameBot
                 CustomId = CustomIDs.Note.ToString("d"),
                 Label = "Note",
                 Required = false,
-                Style = TextInputStyle.Paragraph
+                Style = TextInputStyle.Paragraph,
+                Value = gameserver.Note
             });
         }
     }

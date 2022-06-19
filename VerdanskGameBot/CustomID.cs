@@ -10,14 +10,32 @@ using System.Threading.Tasks;
 
 namespace VerdanskGameBot
 {
+    public enum CustomIDs
+    {
+        AddServerSource,
+        ChangeServerSource,
+        ServernameOption,
+        ButtonOption,
+
+        TryAgainButton,
+        JoinServerButton,
+
+        GameType,
+        HostIPPort,
+        GamePort,
+        UpdateInterval,
+        Note,
+
+    }
+
     [MessagePackObject]
     public class CustomID
     {
         [Key(0)]
-        public string Source { get; set; }
+        public CustomIDs Source { get; set; }
 
         [Key(1)]
-        public Dictionary<string, object> Options { get; set; }
+        public Dictionary<CustomIDs, string> Options { get; set; }
 
         internal string Serialize()
         {

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using NLog;
 using NLog.Config;
 using NLog.Targets;
+using NodaTime;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -48,6 +49,17 @@ namespace VerdanskGameBot
                     File.Move(filepath, $"{splitpath[0]}_{createTime:yyyy-MM-dd_HH-mm-ss}.{splitpath[1]}");
                 }
             });
+
+            #region Pre-Start Debugging
+
+#if DEBUG
+
+            
+
+#endif
+
+            #endregion
+
 
             new Program().MainApp();
 
@@ -163,7 +175,7 @@ namespace VerdanskGameBot
                 return;
             }
 
-            CheckGamedigInstal();
+            CheckGamedigInstall();
 
             var token = "";
             var isverbose = false;
@@ -212,7 +224,7 @@ namespace VerdanskGameBot
             BotClient.StartAsync().Wait();
         }
 
-        private void CheckGamedigInstal()
+        private void CheckGamedigInstall()
         {
             try { StaticNodeJSService.InvokeFromStringAsync<string>(@"module.exports = (callback) => { require('gamedig'); callback(null, 'GAMEDIGTEST'); }").Wait(); }
             catch

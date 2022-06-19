@@ -25,7 +25,7 @@ namespace VerdanskGameBot
         private static Dictionary<string, Timer> Watchers;
         private static Timer GlobalTimer;
 
-        private static Mutex UpdateMutex = new Mutex(false);
+        private static Dictionary<string, Mutex> UpdateMutexes;
 
         // Run on Bot thread (SHOULD NOT BLOCK)
         internal static void StartWatcher() { try { Task.Run(() => QueryGameServersToWatch(), Program.ExitCancel.Token); } catch { return; } }
@@ -44,16 +44,14 @@ namespace VerdanskGameBot
             }
 
             Watchers = new Dictionary<string, Timer>();
+            UpdateMutexes = new Dictionary<string, Mutex>();
 
             using (var db = new GameServersDb())
             {
                 Parallel.ForEach(db.GameServers, gameServer =>
                 {
-                    var timetoupdate = (gameServer.LastUpdate + gameServer.UpdateInterval) - DateTimeOffset.Now;
-                    Watchers.Add(gameServer.ServerName, new Timer(callback: WatcherTimer_Elapsed, state: gameServer,
-                        dueTime: timetoupdate <= TimeSpan.Zero ? TimeSpan.Zero : timetoupdate, period: gameServer.UpdateInterval));
-                    Program.Log.Trace($"Started watcher for game server {{ {gameServer.ServerName} }} | next update in {timetoupdate.TotalSeconds} s.");
-                });
+                    AddToWatcher(gameServer);
+                }) ;
             }
 
             Program.Log.Debug("Game server watchers Started.");
@@ -67,13 +65,22 @@ namespace VerdanskGameBot
             });
         }
 
+        private static void AddToWatcher(GameServerModel gameServer)
+        {
+            var timetoupdate = (gameServer.LastUpdate + gameServer.UpdateInterval) - DateTimeOffset.Now;
+            Watchers.Add(gameServer.ServerName, new Timer(callback: WatcherTimer_Elapsed, state: gameServer,
+                dueTime: timetoupdate <= TimeSpan.Zero ? TimeSpan.Zero : timetoupdate, period: gameServer.UpdateInterval));
+            UpdateMutexes.Add(gameServer.ServerName, new Mutex(false));
+            Program.Log.Trace($"Started watcher for game server {{ {gameServer.ServerName} }} | next update in {timetoupdate.TotalSeconds} s.");
+        }
+
         #region GameServerUpdate
 
         private static void WatcherTimer_Elapsed(object gameserver) { try { Task.Run(() => UpdateGameServerStatus(gameserver as GameServerModel), Program.ExitCancel.Token); } catch { return; } }
 
         private static void UpdateGameServerStatus(GameServerModel gameserver)
         {
-            if(!UpdateMutex.WaitOne(0)) return;
+            if (!UpdateMutexes[gameserver.ServerName].WaitOne(0)) return;
 
             Program.Log.Trace($"Updating game server {{ {gameserver.ServerName} }}");
 
@@ -87,7 +94,7 @@ namespace VerdanskGameBot
             {
                 gamedig = JsonDocument.Parse(StaticNodeJSService.InvokeFromStreamAsync<string>(
                     Assembly.GetExecutingAssembly().GetManifestResourceStream(typeof(GameServerWatcher), "query.js"),
-                    args: new string[] { gameserver.GameType, gameserver.GamePort.ToString() }).Result);
+                    args: new string[] { gameserver.IP.ToString(), gameserver.GameType == "valve" ? "przomboid" : gameserver.GameType, gameserver.GamePort.ToString() }).Result);
             }
             catch (Exception exc)
             {
@@ -130,7 +137,7 @@ namespace VerdanskGameBot
 
             CommandService.UpdateGameServerStatusMessage(Program.BotClient, gameserver);
 
-            UpdateMutex.ReleaseMutex();
+            UpdateMutexes[gameserver.ServerName].ReleaseMutex();
 
             Program.Log.Trace($"Game server with name {{ {gameserver.ServerName} }} updated.");
         }
@@ -139,13 +146,13 @@ namespace VerdanskGameBot
         {
             Watchers[gameServer.ServerName].Change(Timeout.Infinite, Timeout.Infinite);
 
-            if (UpdateMutex.WaitOne(3000)) return true;
+            if (UpdateMutexes[gameServer.ServerName].WaitOne(15000)) return true;
             else return false;
         }
 
         internal static void ResumeUpdate(GameServerModel gameServer)
         {
-            UpdateMutex.ReleaseMutex();
+            UpdateMutexes[gameServer.ServerName].ReleaseMutex();
 
             var timetoupdate = (gameServer.LastUpdate + gameServer.UpdateInterval) - DateTimeOffset.Now;
 
@@ -156,19 +163,31 @@ namespace VerdanskGameBot
 
         #region Main Methods
 
-        internal static Task<GameServerModel> AddGameServer(SocketModal modal, IMessage placeholder)
+        internal static Task<GameServerModel> ChangeGameServer(SocketModal modal)
         {
             var customid = CustomID.Deserialize(modal.Data.CustomId);
 
-            string gametype = modal.Data.Components.First(cmp => cmp.CustomId == "gametype").Value;
-            string host_ip = modal.Data.Components.First(cmp => cmp.CustomId == "host_ip").Value;
-            IPAddress ip; ushort gameport;
+            string servername = customid.Options[CustomIDs.ServernameOption];
+
+            string gametype = modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.GameType.ToString("d")).Value;
+            string host_ip = modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.HostIPPort.ToString("d")).Value.Split(':')[0];
+            string notes = modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.Note.ToString("d")).Value;
+
+            GameServerModel theserver; IPAddress ip; ushort gameport; int update_interval;
+
+            using (var db = new GameServersDb())
+                theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == servername);
+
+            PauseUpdate(theserver);
 
             Program.Log.Debug($"Resolving hostname \"{host_ip}\" ...");
             try
             {
-                ip = new LookupClient(new[]{ NameServer.Cloudflare, NameServer.Cloudflare2 }).QueryAsync(host_ip, QueryType.A).Result.Answers.AddressRecords().FirstOrDefault().Address;
-                gameport = ushort.Parse(modal.Data.Components.FirstOrDefault(cmp => cmp.CustomId == "game_port").Value);
+                if (!IPAddress.TryParse(host_ip, out ip))
+                    ip = new LookupClient(new[] { NameServer.Cloudflare, NameServer.Cloudflare2, NameServer.GooglePublicDns, NameServer.GooglePublicDns2 }).QueryAsync(host_ip, QueryType.A).Result.Answers.AddressRecords().FirstOrDefault().Address;
+
+                if (!ushort.TryParse(modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.HostIPPort.ToString("d")).Value.Split(':')[1], out gameport)) throw new GamePortFormatException();
+                if (!int.TryParse(modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.UpdateInterval.ToString("d")).Value, out update_interval)) throw new UpdateIntervalFormatException();
             }
             catch (InvalidOperationException invopexc)
             {
@@ -176,13 +195,94 @@ namespace VerdanskGameBot
 
                 return Task.FromException<GameServerModel>(invopexc);
             }
-            catch (FormatException formatexc)
+            catch (GamePortFormatException gpformatexc)
             {
-                Program.Log.Debug(formatexc, $"Game/RCON port is not in the correct format.");
+                Program.Log.Debug(gpformatexc, $"Game port is not in the correct format.");
 
-                return Task.FromException<GameServerModel>(formatexc);
+                return Task.FromException<GameServerModel>(gpformatexc);
             }
-            catch(Exception exc)
+            catch (UpdateIntervalFormatException gpformatexc)
+            {
+                Program.Log.Debug(gpformatexc, $"Update interval is not in the correct format.");
+
+                return Task.FromException<GameServerModel>(gpformatexc);
+            }
+            catch (Exception exc)
+            {
+                Program.Log.Error(exc);
+
+                return Task.FromException<GameServerModel>(exc);
+            }
+
+            Program.Log.Debug($"Resolved hostname \"{host_ip}\" having IP : {ip}");
+
+            theserver.GameType = gametype;
+            theserver.IsOnline = false;
+            theserver.IP = ip;
+            theserver.GamePort = gameport;
+            theserver.UpdateInterval = TimeSpan.FromMinutes(update_interval);
+            theserver.LastOnline = DateTimeOffset.UnixEpoch;
+            theserver.Note = notes;
+
+            using (var db = new GameServersDb())
+            {
+                try
+                {
+                    db.Update(theserver);
+                    db.SaveChanges();
+                }
+                catch (Exception exc)
+                {
+                    Program.Log.Error(exc);
+                    return Task.FromException<GameServerModel>(exc);
+                }
+                Program.Log.Debug($"Updated a game server in database.");
+            }
+
+            ResumeUpdate(theserver);
+            Watchers[theserver.ServerName].Change(TimeSpan.Zero, theserver.UpdateInterval);
+
+            return Task.FromResult(theserver);
+        }
+
+        internal static Task<GameServerModel> AddGameServer(SocketModal modal, IMessage placeholder)
+        {
+            var customid = CustomID.Deserialize(modal.Data.CustomId);
+
+            string gametype = modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.GameType.ToString("d")).Value;
+            string host_ip = modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.HostIPPort.ToString("d")).Value.Split(':')[0];
+            string notes = modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.Note.ToString("d")).Value;
+
+            IPAddress ip; ushort gameport; int update_interval;
+
+            Program.Log.Debug($"Resolving hostname \"{host_ip}\" ...");
+            try
+            {
+                if (!IPAddress.TryParse(host_ip, out ip))
+                    ip = new LookupClient(new[]{ NameServer.Cloudflare, NameServer.Cloudflare2, NameServer.GooglePublicDns, NameServer.GooglePublicDns2 }).QueryAsync(host_ip, QueryType.A).Result.Answers.AddressRecords().FirstOrDefault().Address;
+                
+                if(!ushort.TryParse(modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.HostIPPort.ToString("d")).Value.Split(':')[1], out gameport)) throw new GamePortFormatException();
+                if(!int.TryParse(modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.UpdateInterval.ToString("d")).Value, out update_interval) && update_interval > 0) throw new UpdateIntervalFormatException();
+            }
+            catch (InvalidOperationException invopexc)
+            {
+                Program.Log.Debug(invopexc, $"Can't get IP Address of {{ {host_ip} }}.");
+
+                return Task.FromException<GameServerModel>(invopexc);
+            }
+            catch (GamePortFormatException gpformatexc)
+            {
+                Program.Log.Debug(gpformatexc, $"Game port is not in the correct format.");
+
+                return Task.FromException<GameServerModel>(gpformatexc);
+            }
+            catch (UpdateIntervalFormatException gpformatexc)
+            {
+                Program.Log.Debug(gpformatexc, $"Update interval is not in the correct format.");
+
+                return Task.FromException<GameServerModel>(gpformatexc);
+            }
+            catch (Exception exc)
             {
                 Program.Log.Error(exc);
 
@@ -191,9 +291,18 @@ namespace VerdanskGameBot
             
             Program.Log.Debug($"Resolved hostname \"{host_ip}\" having IP : {ip}");
 
+            using (var db = new GameServersDb())
+            if (db.GameServers.Any(server => server.IP == ip && server.GamePort == gameport))
+            {
+                var existexc = new AlreadyExistException();
+                Program.Log.Debug(existexc, "Server with the same Public IP and Port exist. Can't add the same server to watch list more than one instance.");
+
+                return (Task<GameServerModel>)Task.FromException(existexc);
+            }
+
             var gameserver = new GameServerModel
             {
-                ServerName = (customid.Options["servername"] as string).Trim(),
+                ServerName = customid.Options[CustomIDs.ServernameOption],
                 GameType = gametype,
                 IsOnline = false,
                 LastOnline = DateTimeOffset.UnixEpoch,
@@ -205,19 +314,12 @@ namespace VerdanskGameBot
                 GameLink = $"steam://connect/{ip}:{gameport}",
                 AddedSince = DateTimeOffset.Now,
                 LastUpdate = DateTimeOffset.UnixEpoch,
-                UpdateInterval = TimeSpan.FromSeconds(10),
+                UpdateInterval = TimeSpan.FromMinutes(update_interval),
+                Note = notes,
             };
 
             using (var db = new GameServersDb())
             {
-                if (db.GameServers.Any(server => server.IP == ip && server.GamePort == gameport))
-                {
-                    var existexc = new AlreadyExistException();
-                    Program.Log.Debug(existexc, "Server with the same Public IP and Port exist. Can't add the same server to watch list more than one instance.");
-
-                    return (Task<GameServerModel>)Task.FromException(existexc);
-                }
-
                 try
                 {
                     db.Add(gameserver);
@@ -231,7 +333,10 @@ namespace VerdanskGameBot
                 Program.Log.Debug($"Added a game server to database.");
             }
 
-            Watchers.Add(gameserver.ServerName, new Timer(callback: WatcherTimer_Elapsed, state: gameserver, dueTime: TimeSpan.Zero, period: gameserver.UpdateInterval));
+            UpdateGameServerStatus(gameserver);
+
+            AddToWatcher(gameserver);
+
             GlobalTimer.Change(TimeSpan.Zero, TimeSpan.FromMinutes(15));
 
             return Task.FromResult(gameserver);

@@ -1,9 +1,9 @@
-﻿module.exports = async (gametype, hostport) => {
+﻿module.exports = async (ip, gametype, gameport) => {
     ret = '';
     await require('gamedig').query({
         type: gametype,
-        host: '192.168.30.3',
-        port: hostport,
+        host: ip,
+        port: gameport,
         maxAttempts: 5
     })
         .then(res => ret = res)
