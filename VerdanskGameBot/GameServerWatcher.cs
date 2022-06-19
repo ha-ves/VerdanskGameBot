@@ -22,10 +22,15 @@ namespace VerdanskGameBot
 {
     internal class GameServerWatcher
     {
-        private static Dictionary<string, Timer> Watchers;
+        private static TimeSpan WatchTimeout = TimeSpan.FromSeconds(15);
+
+        private static Dictionary<string, Tuple<Timer, ManualResetEvent>> Watchers;
         private static Timer GlobalTimer;
 
         private static Dictionary<string, Mutex> UpdateMutexes;
+        private static bool IsPaused = false;
+
+        #region Watcher Methods
 
         // Run on Bot thread (SHOULD NOT BLOCK)
         internal static void StartWatcher() { try { Task.Run(() => QueryGameServersToWatch(), Program.ExitCancel.Token); } catch { return; } }
@@ -43,7 +48,7 @@ namespace VerdanskGameBot
                 Program.Log.Debug("Created gameservers sqlite database file with default values.");
             }
 
-            Watchers = new Dictionary<string, Timer>();
+            Watchers = new Dictionary<string, Tuple<Timer, ManualResetEvent>>();
             UpdateMutexes = new Dictionary<string, Mutex>();
 
             using (var db = new GameServersDb())
@@ -68,33 +73,45 @@ namespace VerdanskGameBot
         private static void AddToWatcher(GameServerModel gameServer)
         {
             var timetoupdate = (gameServer.LastUpdate + gameServer.UpdateInterval) - DateTimeOffset.Now;
-            Watchers.Add(gameServer.ServerName, new Timer(callback: WatcherTimer_Elapsed, state: gameServer,
-                dueTime: timetoupdate <= TimeSpan.Zero ? TimeSpan.Zero : timetoupdate, period: gameServer.UpdateInterval));
+            Watchers.Add(gameServer.ServerName, new Tuple<Timer, ManualResetEvent>(new Timer(callback: WatcherTimer_Elapsed, state: new Tuple<string, TimeSpan>(gameServer.ServerName, gameServer.UpdateInterval),
+                dueTime: timetoupdate <= TimeSpan.Zero ? TimeSpan.Zero : timetoupdate, period: gameServer.UpdateInterval), new ManualResetEvent(false)));
             UpdateMutexes.Add(gameServer.ServerName, new Mutex(false));
             Program.Log.Trace($"Started watcher for game server {{ {gameServer.ServerName} }} | next update in {timetoupdate.TotalSeconds} s.");
         }
 
+        #endregion
+
         #region GameServerUpdate
 
-        private static void WatcherTimer_Elapsed(object gameserver) { try { Task.Run(() => UpdateGameServerStatus(gameserver as GameServerModel), Program.ExitCancel.Token); } catch { return; } }
+        private static void WatcherTimer_Elapsed(object tupel) { try { Task.Run(() => UpdateGameServerStatus(tupel as Tuple<string, TimeSpan>), Program.ExitCancel.Token); } catch { return; } }
 
-        private static void UpdateGameServerStatus(GameServerModel gameserver)
+        private static void UpdateGameServerStatus(Tuple<string, TimeSpan> tupel)
         {
-            if (!UpdateMutexes[gameserver.ServerName].WaitOne(0)) return;
+            if (!UpdateMutexes[tupel.Item1].WaitOne(tupel.Item2)) return;
 
-            Program.Log.Trace($"Updating game server {{ {gameserver.ServerName} }}");
+            Program.Log.Trace($"Updating game server {{ {tupel.Item1} }}");
+
+            GameServerModel gameserver;
 
             using (var db = new GameServersDb())
-                gameserver = db.GameServers.First(gs => gs.Id == gameserver.Id);
+                gameserver = db.GameServers.First(gs => gs.ServerName == tupel.Item1);
 
             gameserver.LastUpdate = DateTimeOffset.Now;
 
             JsonDocument gamedig;
             try
             {
+                var attempts = 3;
                 gamedig = JsonDocument.Parse(StaticNodeJSService.InvokeFromStreamAsync<string>(
                     Assembly.GetExecutingAssembly().GetManifestResourceStream(typeof(GameServerWatcher), "query.js"),
-                    args: new string[] { gameserver.IP.ToString(), gameserver.GameType == "valve" ? "przomboid" : gameserver.GameType, gameserver.GamePort.ToString() }).Result);
+                    args: new string[]
+                    {
+                        gameserver.IP.ToString(),
+                        gameserver.GameType == "valve" ? "przomboid" : gameserver.GameType,
+                        gameserver.GamePort.ToString(),
+                        attempts.ToString(),
+                        (WatchTimeout.TotalMilliseconds / attempts).ToString("#")
+                    }).Result);
             }
             catch (Exception exc)
             {
@@ -135,8 +152,9 @@ namespace VerdanskGameBot
                 db.SaveChanges();
             }
 
-            CommandService.UpdateGameServerStatusMessage(Program.BotClient, gameserver);
+            CommandService.UpdateGameServerStatusMessage(gameserver);
 
+            Watchers[gameserver.ServerName].Item2.Set();
             UpdateMutexes[gameserver.ServerName].ReleaseMutex();
 
             Program.Log.Trace($"Game server with name {{ {gameserver.ServerName} }} updated.");
@@ -144,24 +162,45 @@ namespace VerdanskGameBot
 
         internal static bool PauseUpdate(GameServerModel gameServer)
         {
-            Watchers[gameServer.ServerName].Change(Timeout.Infinite, Timeout.Infinite);
+            if (IsPaused) return true;
 
-            if (UpdateMutexes[gameServer.ServerName].WaitOne(15000)) return true;
+            Watchers[gameServer.ServerName].Item1.Change(Timeout.Infinite, Timeout.Infinite);
+
+            if (UpdateMutexes[gameServer.ServerName].WaitOne(WatchTimeout))
+            {
+                IsPaused = true;
+                return true;
+            }
             else return false;
         }
 
         internal static void ResumeUpdate(GameServerModel gameServer)
         {
+            if (!IsPaused) return;
+
             UpdateMutexes[gameServer.ServerName].ReleaseMutex();
 
             var timetoupdate = (gameServer.LastUpdate + gameServer.UpdateInterval) - DateTimeOffset.Now;
 
-            Watchers[gameServer.ServerName].Change(dueTime: timetoupdate <= TimeSpan.Zero ? TimeSpan.Zero : timetoupdate, period: gameServer.UpdateInterval);
+            Watchers[gameServer.ServerName].Item1.Change(dueTime: timetoupdate <= TimeSpan.Zero ? TimeSpan.Zero : timetoupdate, period: gameServer.UpdateInterval);
+
         }
 
         #endregion
 
         #region Main Methods
+
+        internal static bool RefreshWatcher(GameServerModel gameServer)
+        {
+            Watchers[gameServer.ServerName].Item2.Reset();
+            if (Watchers[gameServer.ServerName].Item1.Change(TimeSpan.Zero, gameServer.UpdateInterval))
+                if (Watchers[gameServer.ServerName].Item2.WaitOne(WatchTimeout))
+                    return true;
+                else
+                    return false;
+            else
+                return false;
+        }
 
         internal static Task<GameServerModel> ChangeGameServer(SocketModal modal)
         {
@@ -240,7 +279,7 @@ namespace VerdanskGameBot
             }
 
             ResumeUpdate(theserver);
-            Watchers[theserver.ServerName].Change(TimeSpan.Zero, theserver.UpdateInterval);
+            Watchers[theserver.ServerName].Item1.Change(TimeSpan.Zero, theserver.UpdateInterval);
 
             return Task.FromResult(theserver);
         }
@@ -333,7 +372,7 @@ namespace VerdanskGameBot
                 Program.Log.Debug($"Added a game server to database.");
             }
 
-            UpdateGameServerStatus(gameserver);
+            UpdateGameServerStatus(new Tuple<string, TimeSpan>(gameserver.ServerName, gameserver.UpdateInterval));
 
             AddToWatcher(gameserver);
 
@@ -342,18 +381,34 @@ namespace VerdanskGameBot
             return Task.FromResult(gameserver);
         }
 
-        internal static void RemoveWatcher(GameServerModel theserver) => Watchers[theserver.ServerName].Dispose();
+        internal static void RemoveWatcher(GameServerModel theserver) => Watchers[theserver.ServerName].Item1.Dispose();
 
         public static async void Dispose()
         {
             if(GlobalTimer != null)
+            {
                 await GlobalTimer.DisposeAsync();
+                GlobalTimer = null;
+            }
 
             if(Watchers != null)
+            {
                 foreach (var tim in Watchers.Values)
                 {
-                    await tim.DisposeAsync();
+                    await tim.Item1.DisposeAsync();
+                    tim.Item2.Dispose();
                 }
+                Watchers.Clear();
+                Watchers = null;
+            }
+
+            if(UpdateMutexes != null)
+            {
+                foreach (var mutex in UpdateMutexes)
+                    mutex.Value.Dispose();
+                UpdateMutexes.Clear();
+                UpdateMutexes = null;
+            }
         }
 
         #endregion

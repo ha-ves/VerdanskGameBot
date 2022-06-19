@@ -213,7 +213,8 @@ namespace VerdanskGameBot
             BotClient = new DiscordSocketClient(new DiscordSocketConfig()
             {
                 LogLevel = isverbose ? LogSeverity.Debug : LogSeverity.Info,
-                DefaultRetryMode = RetryMode.RetryTimeouts
+                DefaultRetryMode = RetryMode.RetryTimeouts,
+                GatewayIntents = GatewayIntents.AllUnprivileged & ~(GatewayIntents.GuildInvites | GatewayIntents.GuildScheduledEvents)
             });
 
             BotClient.Log += ClientLog;

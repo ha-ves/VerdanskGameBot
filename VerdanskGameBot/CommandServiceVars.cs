@@ -57,6 +57,13 @@ namespace VerdanskGameBot
                         Description = "Change a server status info of this discord guild/server.",
                         Type = ApplicationCommandOptionType.SubCommand,
                         Options = new List<SlashCommandOptionBuilder> { Servername }
+                    },
+                    new SlashCommandOptionBuilder
+                    {
+                        Name = "refresh",
+                        Description = "Refresh a server status info of this discord guild/server.",
+                        Type = ApplicationCommandOptionType.SubCommand,
+                        Options = new List<SlashCommandOptionBuilder> { Servername }
                     }
                 }
             },

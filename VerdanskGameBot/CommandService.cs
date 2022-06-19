@@ -56,9 +56,9 @@ namespace VerdanskGameBot
             Program.Log.Debug("Successfully posted commands to guild.");
         }
 
-        internal static void UpdateGameServerStatusMessage(DiscordSocketClient bot, GameServerModel gameserver)
+        internal static void UpdateGameServerStatusMessage(GameServerModel gameserver)
         {
-            var chan = (bot.GetChannelAsync(gameserver.ChannelId).Result as ITextChannel);
+            var chan = (Program.BotClient.GetChannelAsync(gameserver.ChannelId).Result as ITextChannel);
 
             chan.ModifyMessageAsync(gameserver.MessageId, msg =>
             {
@@ -171,12 +171,37 @@ namespace VerdanskGameBot
                 case "change":
                     GameServerChangeHandler(cmd, subcmd.Options);
                     break;
+                case "refresh":
+                    GameServerRefreshHandler(cmd, subcmd.Options);
+                    break;
                 default:
                     cmd.RespondAsync("Command invalid.", ephemeral: true).Wait();
                     break;
             }
 
             Program.Log.Debug(cmd.HasResponded ? "^ Responded successfully." : "^ No response sent.");
+        }
+
+        private static async void GameServerRefreshHandler(SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
+        {
+            var servername = options.First().Value as string;
+
+            GameServerModel theserver;
+
+            using (var db = new GameServersDb())
+                theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == servername);
+
+            if (theserver == null)
+                cmd.RespondAsync($"There is no gameserver with name \"{servername}\". Please check the correct name.", ephemeral: true).Wait();
+            else
+            {
+                await cmd.DeferAsync(ephemeral: true);
+
+                if (GameServerWatcher.RefreshWatcher(theserver))
+                    await cmd.FollowupAsync($"Refreshed game server `{servername}`'s status info.", ephemeral: true);
+                else
+                    await cmd.FollowupAsync($"Can not refresh game server `{servername}`'s status info.", ephemeral: true);
+            }
         }
 
         private static void GameServerChangeHandler(SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
@@ -190,8 +215,8 @@ namespace VerdanskGameBot
 
             if (theserver == null)
                 cmd.RespondAsync($"There is no gameserver with name \"{servername}\". Please check the correct name.", ephemeral: true).Wait();
-
-            cmd.RespondWithModalAsync(new ChangeServerModalBuilder(theserver).Build()).Wait();
+            else
+                cmd.RespondWithModalAsync(new ChangeServerModalBuilder(theserver).Build()).Wait();
         }
 
         private static void GameServerListingHandler(SocketSlashCommand cmd)
