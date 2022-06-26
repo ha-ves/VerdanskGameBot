@@ -11,7 +11,9 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Reflection;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
@@ -24,9 +26,13 @@ namespace VerdanskGameBot
 
         internal static Logger Log = LogManager.GetCurrentClassLogger();
 
+        internal static DiscordSocketClient BotClient;
+
         internal static CancellationTokenSource ExitCancel = new CancellationTokenSource();
 
         internal static bool IsExiting = false, IsConnected = false;
+
+        internal static IPAddress LocalIP;
 
         private static void Main(string[] args)
         {
@@ -155,8 +161,6 @@ namespace VerdanskGameBot
         }
         #endregion
 
-        internal static DiscordSocketClient BotClient;
-
         private void MainApp()
         {
             Log.Info("");
@@ -195,6 +199,7 @@ namespace VerdanskGameBot
 
                 token = config["BotToken"];
                 isverbose = bool.Parse(config["Verbose"]);
+                LocalIP = IPAddress.Parse(config["LocalIP"]);
             }
             catch (Exception ex)
             {

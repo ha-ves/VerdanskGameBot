@@ -106,7 +106,24 @@ namespace VerdanskGameBot
                     Assembly.GetExecutingAssembly().GetManifestResourceStream(typeof(GameServerWatcher), "query.js"),
                     args: new string[]
                     {
-                        gameserver.IP.ToString(),
+                        /* in case you're running the bot in the same system or internal NAT
+                         * ex: i run the bot in a public facing VPS that acts as router with NAT,
+                         * the game servers use VPN to connect to the VPS and get public ip with port forwarding
+                         * 
+                         * ex architecture:
+                         * ~~~~~~~~~~~~~~~~~INTERNET~~~~~~~~~~~~~~~~
+                         * ----------------Public IP----------------
+                         * --------------------|--------------------
+                         * -------------------VPS-------------------
+                         * ------------NAT & Port Forward-----------
+                         * -------------------=|=-------------------
+                         * -------v=======Internal VPN======v-------
+                         * ------=|=----------=|=----------=|=------
+                         * --GameServer1--GameServer2--GameServer3--
+                         */
+                        NetworkInterface.GetAllNetworkInterfaces().FirstOrDefault(
+                            intf => intf.GetIPProperties().UnicastAddresses.FirstOrDefault(
+                                ipinfo => ipinfo.Address.Equals(gameserver.IP)) != null) == null ? gameserver.IP.ToString() : Program.LocalIP.ToString(),
                         gameserver.GameType == "valve" ? "przomboid" : gameserver.GameType,
                         gameserver.GamePort.ToString(),
                         attempts.ToString(),
@@ -222,13 +239,9 @@ namespace VerdanskGameBot
             Program.Log.Debug($"Resolving hostname \"{host_ip}\" ...");
             try
             {
-                if (!IPAddress.TryParse(host_ip, out ip))
-                    ip = new LookupClient(new[] { NameServer.Cloudflare, NameServer.Cloudflare2, NameServer.GooglePublicDns, NameServer.GooglePublicDns2 }).QueryAsync(host_ip, QueryType.A).Result.Answers.AddressRecords().FirstOrDefault().Address;
-
-                if (!ushort.TryParse(modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.HostIPPort.ToString("d")).Value.Split(':')[1], out gameport)) throw new GamePortFormatException();
-                if (!int.TryParse(modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.UpdateInterval.ToString("d")).Value, out update_interval)) throw new UpdateIntervalFormatException();
+                ParseHostIPGamePort(modal, host_ip, out ip, out gameport, out update_interval);
             }
-            catch (InvalidOperationException invopexc)
+            catch (SocketException invopexc)
             {
                 Program.Log.Debug(invopexc, $"Can't get IP Address of {{ {host_ip} }}.");
 
@@ -297,17 +310,13 @@ namespace VerdanskGameBot
             Program.Log.Debug($"Resolving hostname \"{host_ip}\" ...");
             try
             {
-                if (!IPAddress.TryParse(host_ip, out ip))
-                    ip = new LookupClient(new[]{ NameServer.Cloudflare, NameServer.Cloudflare2, NameServer.GooglePublicDns, NameServer.GooglePublicDns2 }).QueryAsync(host_ip, QueryType.A).Result.Answers.AddressRecords().FirstOrDefault().Address;
-                
-                if(!ushort.TryParse(modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.HostIPPort.ToString("d")).Value.Split(':')[1], out gameport)) throw new GamePortFormatException();
-                if(!int.TryParse(modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.UpdateInterval.ToString("d")).Value, out update_interval) && update_interval > 0) throw new UpdateIntervalFormatException();
+                ParseHostIPGamePort(modal, host_ip, out ip, out gameport, out update_interval);
             }
-            catch (InvalidOperationException invopexc)
+            catch (SocketException sockexc)
             {
-                Program.Log.Debug(invopexc, $"Can't get IP Address of {{ {host_ip} }}.");
+                Program.Log.Debug(sockexc, $"Can't get IP Address of {{ {host_ip} }}.");
 
-                return Task.FromException<GameServerModel>(invopexc);
+                return Task.FromException<GameServerModel>(sockexc);
             }
             catch (GamePortFormatException gpformatexc)
             {
@@ -382,6 +391,23 @@ namespace VerdanskGameBot
         }
 
         internal static void RemoveWatcher(GameServerModel theserver) => Watchers[theserver.ServerName].Item1.Dispose();
+
+        private static void ParseHostIPGamePort(SocketModal modal, string host_ip, out IPAddress ip, out ushort gameport, out int update_interval)
+        {
+            if (!IPAddress.TryParse(host_ip, out ip))
+                /* 
+                 * Use system default DNS resolver
+                 */
+                ip = Dns.GetHostAddresses(host_ip).First();
+            /* 
+             * In case you want to use your own or specific DNS service,
+             * uncomment the line below
+             */
+            //ip = new LookupClient(new[] { new IPEndPoint(/* DNS provider IP Address */, /* DNS Query Port (usually 53) */), NameServer.Cloudflare, NameServer.Cloudflare2, NameServer.GooglePublicDns, NameServer.GooglePublicDns2 }).QueryAsync(host_ip, QueryType.A).Result.Answers.AddressRecords().FirstOrDefault().Address;
+
+            if (!ushort.TryParse(modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.HostIPPort.ToString("d")).Value.Split(':')[1], out gameport)) throw new GamePortFormatException();
+            if (!int.TryParse(modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.UpdateInterval.ToString("d")).Value, out update_interval)) throw new UpdateIntervalFormatException();
+        }
 
         public static async void Dispose()
         {

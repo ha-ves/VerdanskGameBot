@@ -1,4 +1,5 @@
 {
-  "BotToken": null,
-  "Verbose": false
+  "BotToken": "",
+  "Verbose": false,
+  "LocalIP": "127.0.0.1"
 }
