@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <UserSecretsId>79540f67-cfd6-4338-857a-f37c08a32dec</UserSecretsId>
   </PropertyGroup>
 
@@ -10,6 +10,8 @@
     <None Remove="BotConfig.json" />
     <None Remove="gameservers.db" />
     <None Remove="NLog.config" />
+    <None Remove="package-lock.json" />
+    <None Remove="package.json" />
     <None Remove="query.js" />
   </ItemGroup>
 
@@ -23,6 +25,8 @@
     <EmbeddedResource Include="NLog.config">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </EmbeddedResource>
+    <EmbeddedResource Include="package-lock.json" />
+    <EmbeddedResource Include="package.json" />
     <EmbeddedResource Include="query.js">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </EmbeddedResource>
@@ -30,19 +34,22 @@
 
   <ItemGroup>
     <PackageReference Include="Discord.Net" Version="3.7.2" />
-    <PackageReference Include="DnsClient" Version="1.6.0" />
-    <PackageReference Include="HtmlAgilityPack" Version="1.11.42" />
-    <PackageReference Include="Jering.Javascript.NodeJS" Version="6.3.0" />
-    <PackageReference Include="MessagePack" Version="2.3.85" />
-    <PackageReference Include="MessagePackAnalyzer" Version="2.3.85" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="5.0.15" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="5.0.15" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="5.0.15">
+    <PackageReference Include="DnsClient" Version="1.6.1" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.11.43" />
+    <PackageReference Include="Jering.Javascript.NodeJS" Version="6.3.1" />
+    <PackageReference Include="MessagePack" Version="2.3.112" />
+    <PackageReference Include="MessagePackAnalyzer" Version="2.3.112">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="5.0.0" />
-    <PackageReference Include="NLog" Version="4.7.14" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.6" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="6.0.6" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="6.0.6">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="6.0.1" />
+    <PackageReference Include="NLog" Version="5.0.1" />
     <PackageReference Include="NodaTime" Version="3.1.0" />
   </ItemGroup>
 
