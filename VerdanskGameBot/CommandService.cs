@@ -182,7 +182,7 @@ namespace VerdanskGameBot
             Program.Log.Debug(cmd.HasResponded ? "^ Responded successfully." : "^ No response sent.");
         }
 
-        private static async void GameServerRefreshHandler(SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
+        private static void GameServerRefreshHandler(SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
         {
             var servername = options.First().Value as string;
 
@@ -195,12 +195,12 @@ namespace VerdanskGameBot
                 cmd.RespondAsync($"There is no gameserver with name \"{servername}\". Please check the correct name.", ephemeral: true).Wait();
             else
             {
-                await cmd.DeferAsync(ephemeral: true);
+                cmd.DeferAsync(ephemeral: true).Wait();
 
                 if (GameServerWatcher.RefreshWatcher(theserver))
-                    await cmd.FollowupAsync($"Refreshed game server `{servername}`'s status info.", ephemeral: true);
+                    cmd.FollowupAsync($"Refreshed game server `{servername}`'s status info.", ephemeral: true).Wait();
                 else
-                    await cmd.FollowupAsync($"Can not refresh game server `{servername}`'s status info.", ephemeral: true);
+                    cmd.FollowupAsync($"Can not refresh game server `{servername}`'s status info.", ephemeral: true).Wait();
             }
         }
 
