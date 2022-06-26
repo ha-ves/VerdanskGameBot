@@ -35,7 +35,7 @@ namespace VerdanskGameBot
 
         private static string GetLastTime(DateTimeOffset lasttime)
         {
-            var period = Period.Between(OffsetDateTime.FromDateTimeOffset(lasttime).LocalDateTime, LocalDateTime.FromDateTime(DateTime.Now), PeriodUnits.AllUnits);
+            var period = Period.Between(LocalDateTime.FromDateTime(lasttime.LocalDateTime), LocalDateTime.FromDateTime(DateTime.Now), PeriodUnits.AllUnits);
 
             var str = "";
 
