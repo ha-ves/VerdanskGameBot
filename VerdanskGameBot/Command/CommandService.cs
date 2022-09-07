@@ -11,8 +11,10 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using VerdanskGameBot.Ext;
+using VerdanskGameBot.GameServer;
 
-namespace VerdanskGameBot
+namespace VerdanskGameBot.Command
 {
     internal partial class CommandService
     {
@@ -182,6 +184,8 @@ namespace VerdanskGameBot
             Program.Log.Debug(cmd.HasResponded ? "^ Responded successfully." : "^ No response sent.");
         }
 
+        #region refresh
+
         private static void GameServerRefreshHandler(SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
         {
             var servername = options.First().Value as string;
@@ -204,6 +208,10 @@ namespace VerdanskGameBot
             }
         }
 
+        #endregion
+
+        #region change
+
         private static void GameServerChangeHandler(SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
         {
             var servername = options.First().Value as string;
@@ -218,6 +226,10 @@ namespace VerdanskGameBot
             else
                 cmd.RespondWithModalAsync(new ChangeServerModalBuilder(theserver).Build()).Wait();
         }
+
+        #endregion
+
+        #region list
 
         private static void GameServerListingHandler(SocketSlashCommand cmd)
         {
@@ -264,6 +276,10 @@ namespace VerdanskGameBot
             }
         }
 
+        #endregion
+
+        #region add
+
         private static void GameServerAdderHandler(SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
         {
             var guild = (cmd.Channel as SocketGuildChannel).Guild;
@@ -291,6 +307,10 @@ namespace VerdanskGameBot
 
             cmd.RespondWithModalAsync(new AddServerModalBuilder(servername).Build()).Wait();
         }
+
+        #endregion
+
+        #region move
 
         private static void GameServerMoverHandler(DiscordSocketClient bot, SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
         {
@@ -336,6 +356,10 @@ namespace VerdanskGameBot
             GameServerWatcher.ResumeUpdate(theserver);
         }
 
+        #endregion
+
+        #region remove
+
         private static void GameServerRemovalHandler(DiscordSocketClient bot, SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
         {
             GameServerModel theserver;
@@ -352,6 +376,8 @@ namespace VerdanskGameBot
 
             (bot.GetChannelAsync(theserver.ChannelId).Result as ITextChannel).DeleteMessageAsync(theserver.MessageId).Wait();
         }
+
+        #endregion
 
         #endregion
 
@@ -377,7 +403,7 @@ namespace VerdanskGameBot
             {
                 Program.Log.Info($"User {{ {modal.User} }} Changed game server \"{servername}\" details for guild \"{guild}\".");
 
-                modal.FollowupAsync($"Changed game server \"{servername}\"'s details.").Wait();
+                modal.FollowupAsync($"Changed game server \"{servername}\"'s details.", ephemeral: true).Wait();
             }
             else
             {
@@ -415,7 +441,7 @@ namespace VerdanskGameBot
             }
         }
 
-        private static async void AddServerModalSubmitHandler(SocketModal modal)
+        private static void AddServerModalSubmitHandler(SocketModal modal)
         {
             var guild = (modal.Channel as SocketTextChannel).Guild;
             var components = modal.Data.Components;

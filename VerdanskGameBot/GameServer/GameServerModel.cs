@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Net;
 using System.Security;
 
-namespace VerdanskGameBot
+namespace VerdanskGameBot.GameServer
 {
     public class GameServerModel
     {

@@ -8,7 +8,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace VerdanskGameBot
+namespace VerdanskGameBot.GameServer
 {
     internal class GameServersDb : DbContext
     {

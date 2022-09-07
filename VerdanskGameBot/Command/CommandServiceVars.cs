@@ -2,7 +2,7 @@
 using Discord.WebSocket;
 using System.Collections.Generic;
 
-namespace VerdanskGameBot
+namespace VerdanskGameBot.Command
 {
     internal partial class CommandService
     {

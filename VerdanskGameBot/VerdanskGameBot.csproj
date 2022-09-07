@@ -4,7 +4,31 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
     <UserSecretsId>79540f67-cfd6-4338-857a-f37c08a32dec</UserSecretsId>
+    <PlatformTarget>x64</PlatformTarget>
+    <Version>0.21.2-net6</Version>
+    <Authors>Haves Irfan (ha-ves)</Authors>
+    <Company>Tekat</Company>
+    <Product>Verdansk Game Bot</Product>
+    <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DefineConstants>$(DefineConstants)</DefineConstants>
+    <DebugType>embedded</DebugType>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DefineConstants>$(DefineConstants)</DefineConstants>
+    <DebugType>embedded</DebugType>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="node_modules\**" />
+    <EmbeddedResource Remove="node_modules\**" />
+    <None Remove="node_modules\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <None Remove="BotConfig.json" />

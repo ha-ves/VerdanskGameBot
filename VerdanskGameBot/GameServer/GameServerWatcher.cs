@@ -17,8 +17,9 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using VerdanskGameBot.Ext;
 
-namespace VerdanskGameBot
+namespace VerdanskGameBot.GameServer
 {
     internal class GameServerWatcher
     {
@@ -56,7 +57,7 @@ namespace VerdanskGameBot
                 Parallel.ForEach(db.GameServers, gameServer =>
                 {
                     AddToWatcher(gameServer);
-                }) ;
+                });
             }
 
             Program.Log.Debug("Game server watchers Started.");
@@ -72,7 +73,7 @@ namespace VerdanskGameBot
 
         private static void AddToWatcher(GameServerModel gameServer)
         {
-            var timetoupdate = (gameServer.LastUpdate + gameServer.UpdateInterval) - DateTimeOffset.Now;
+            var timetoupdate = gameServer.LastUpdate + gameServer.UpdateInterval - DateTimeOffset.Now;
             Watchers.Add(gameServer.ServerName, new Tuple<Timer, ManualResetEvent>(new Timer(callback: WatcherTimer_Elapsed, state: new Tuple<string, TimeSpan>(gameServer.ServerName, gameServer.UpdateInterval),
                 dueTime: timetoupdate <= TimeSpan.Zero ? TimeSpan.Zero : timetoupdate, period: gameServer.UpdateInterval), new ManualResetEvent(false)));
             UpdateMutexes.Add(gameServer.ServerName, new Mutex(false));
@@ -162,7 +163,7 @@ namespace VerdanskGameBot
                         $"...{Environment.NewLine}" + page;
                 }
             }
-            
+
             using (var db = new GameServersDb())
             {
                 db.Update(gameserver);
@@ -197,7 +198,7 @@ namespace VerdanskGameBot
 
             UpdateMutexes[gameServer.ServerName].ReleaseMutex();
 
-            var timetoupdate = (gameServer.LastUpdate + gameServer.UpdateInterval) - DateTimeOffset.Now;
+            var timetoupdate = gameServer.LastUpdate + gameServer.UpdateInterval - DateTimeOffset.Now;
 
             Watchers[gameServer.ServerName].Item1.Change(dueTime: timetoupdate <= TimeSpan.Zero ? TimeSpan.Zero : timetoupdate, period: gameServer.UpdateInterval);
 
@@ -336,17 +337,17 @@ namespace VerdanskGameBot
 
                 return Task.FromException<GameServerModel>(exc);
             }
-            
+
             Program.Log.Debug($"Resolved hostname \"{host_ip}\" having IP : {ip}");
 
             using (var db = new GameServersDb())
-            if (db.GameServers.Any(server => server.IP == ip && server.GamePort == gameport))
-            {
-                var existexc = new AlreadyExistException();
-                Program.Log.Debug(existexc, "Server with the same Public IP and Port exist. Can't add the same server to watch list more than one instance.");
+                if (db.GameServers.Any(server => server.IP == ip && server.GamePort == gameport))
+                {
+                    var existexc = new AlreadyExistException();
+                    Program.Log.Debug(existexc, "Server with the same Public IP and Port exist. Can't add the same server to watch list more than one instance.");
 
-                return (Task<GameServerModel>)Task.FromException(existexc);
-            }
+                    return (Task<GameServerModel>)Task.FromException(existexc);
+                }
 
             var gameserver = new GameServerModel
             {
@@ -411,13 +412,13 @@ namespace VerdanskGameBot
 
         public static async void Dispose()
         {
-            if(GlobalTimer != null)
+            if (GlobalTimer != null)
             {
                 await GlobalTimer.DisposeAsync();
                 GlobalTimer = null;
             }
 
-            if(Watchers != null)
+            if (Watchers != null)
             {
                 foreach (var tim in Watchers.Values)
                 {
@@ -428,7 +429,7 @@ namespace VerdanskGameBot
                 Watchers = null;
             }
 
-            if(UpdateMutexes != null)
+            if (UpdateMutexes != null)
             {
                 foreach (var mutex in UpdateMutexes)
                     mutex.Value.Dispose();

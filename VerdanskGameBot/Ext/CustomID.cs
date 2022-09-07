@@ -8,7 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace VerdanskGameBot
+namespace VerdanskGameBot.Ext
 {
     public enum CustomIDs
     {

@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using VerdanskGameBot;
+using VerdanskGameBot.GameServer;
 
 namespace VerdanskGameBot.Migrations
 {
