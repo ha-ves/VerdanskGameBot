@@ -18,8 +18,8 @@ namespace VerdanskGameBot.GameServer
             var rand = new Random((int)(DateTimeOffset.Now - server.AddedSince).Ticks);
             WithColor(new Color(rand.Next(255), rand.Next(255), rand.Next(255)));
 
-            AddField(server.IsOnline ? ":green_circle: Online" : ":red_circle: Offline", (server.IsOnline ? "Server is Online" : $"Last online : " +
-                (server.LastOnline > server.AddedSince ? server.LastOnline.ToString("MMM dd yyyy hh:mm tt") + $"{Environment.NewLine}*({GetLastTime(server.LastOnline)})*" : "Never")) + $"{Environment.NewLine}⠀", true);
+            AddField(server.IsOnline ? ":green_circle: Online" : ":red_circle: Offline", (server.IsOnline ? "Server is Online" : "Last online : " +
+                (server.LastOnline > server.AddedSince ? $"<t:{server.LastOnline.ToUnixTimeSeconds()}> (<t:{server.LastOnline.ToUnixTimeSeconds()}:R>)" : "Never")) + $"{Environment.NewLine}⠀", true);
             AddField("IP Address", server.IP.ToString(), true);
             AddField("Game Port", server.GamePort.ToString(), true);
 
@@ -31,39 +31,6 @@ namespace VerdanskGameBot.GameServer
 
             WithFooter($"Last checked ->");
             WithCurrentTimestamp();
-        }
-
-        private static string GetLastTime(DateTimeOffset lasttime)
-        {
-            var period = Period.Between(LocalDateTime.FromDateTime(lasttime.LocalDateTime), LocalDateTime.FromDateTime(DateTime.Now), PeriodUnits.AllUnits);
-
-            var str = "";
-
-            str += period.Years > 0 ? period.Years + " Years " : "";
-
-            str += period.Months > 0 ? period.Months + " Months " : "";
-
-            str += period.Weeks > 0 ? period.Weeks + " Weeks " : "";
-
-            if (period.Years > 0)
-                return str + "ago.";
-
-            str += period.Days > 0 ? period.Days + " Days " : "";
-
-            if (period.Months > 0)
-                return str + "ago.";
-
-            str += period.Hours > 0 ? period.Hours + " Hours " : "";
-
-            if (period.Weeks > 0)
-                return str + "ago.";
-
-            str += period.Minutes > 0 ? period.Minutes + " Minutes " : "";
-
-            if (str == "")
-                return "a few seconds ago.";
-            else
-                return str + "ago.";
         }
     }
 }
