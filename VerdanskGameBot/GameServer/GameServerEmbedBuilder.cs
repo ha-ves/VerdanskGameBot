@@ -19,7 +19,7 @@ namespace VerdanskGameBot.GameServer
             WithColor(new Color(rand.Next(255), rand.Next(255), rand.Next(255)));
 
             AddField(server.IsOnline ? ":green_circle: Online" : ":red_circle: Offline", (server.IsOnline ? "Server is Online" : "Last online : " +
-                (server.LastOnline > server.AddedSince ? $"<t:{server.LastOnline.ToUnixTimeSeconds()}> (<t:{server.LastOnline.ToUnixTimeSeconds()}:R>)" : "Never")) + $"{Environment.NewLine}⠀", true);
+                (server.LastOnline > server.AddedSince ? $"<t:{server.LastOnline.ToUnixTimeSeconds()}:R>" : "Never")) + $"{Environment.NewLine}⠀", true);
             AddField("IP Address", server.IP.ToString(), true);
             AddField("Game Port", server.GamePort.ToString(), true);
 

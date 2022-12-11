@@ -14,7 +14,7 @@ namespace VerdanskGameBot.Command
             IsRequired = true,
         };
 
-        internal static List<SlashCommandBuilder> Commands = new()
+        internal static List<SlashCommandProperties> Commands = new()
         {
             //game servers command
             new SlashCommandBuilder
@@ -66,8 +66,7 @@ namespace VerdanskGameBot.Command
                         Options = new List<SlashCommandOptionBuilder> { Servername }
                     }
                 }
-            },
-
+            }.Build()
         };
     }
 }

@@ -18,44 +18,57 @@ namespace VerdanskGameBot.Command
 {
     internal partial class CommandService
     {
-        internal static void StartService(DiscordSocketClient botclient)
+        internal static async Task StartService(DiscordSocketClient botclient, CancellationToken canceltoken)
         {
+            if (canceltoken.IsCancellationRequested)
+                return;
+
             botclient.SlashCommandExecuted += SlashCommand_Executed;
             botclient.ModalSubmitted += ModalSubmit_Executed;
             botclient.ButtonExecuted += ButtonClick_Executed;
 
-            try { Task.Run(() => PostCommands(botclient, Commands), Program.ExitCancel.Token); }
-            catch { return; }
+            await PostCommands(botclient, canceltoken);
         }
 
         #region Events / Run on Bot thread (SHOULD NOT BLOCK)
 
-        private static void PostCommands(DiscordSocketClient bot, List<SlashCommandBuilder> commands)
+        private static async Task PostCommands(DiscordSocketClient bot, CancellationToken canceltoken)
         {
-            Program.Log.Debug("Posting commands to guild.");
+            if (canceltoken.IsCancellationRequested)
+                return;
 
+            
             var guild = bot.Guilds.First();
 
             if (guild == null)
             {
                 Program.Log.Fatal("This bot is not invited to any discord server yet. Invite to your server first.");
-                Environment.Exit(-500);
+                Environment.Exit(-(int)ExitCodes.BotNoGuild);
             }
 
-            try
+            var failed = false;
+            Program.Log.Debug($"Posting commands to guild {guild.Name}.");
+
+            await guild.DeleteApplicationCommandsAsync();
+            Commands.ForEach(async cmd =>
             {
-                commands.ForEach(async cmd =>
+                try
                 {
-                    await guild.BulkOverwriteApplicationCommandAsync(new ApplicationCommandProperties[] { cmd.Build() });
-                    Program.Log.Trace($"/{cmd.Name} command posted to {guild}");
-                });
-            }
-            catch (Discord.Net.HttpException exc)
-            {
-                Program.Log.Debug(exc, "Failed to post commands to guild.");
-            }
 
-            Program.Log.Debug("Successfully posted commands to guild.");
+                    await guild.CreateApplicationCommandAsync(cmd);
+                    Program.Log.Trace($"/{cmd.Name} command posted to {guild}");
+                }
+                catch (Exception exc)
+                {
+                    Program.Log.Debug(exc, $"Failed to post /{cmd.Name} command to guild '{guild.Name}'.");
+                    failed = true;
+                }
+            });
+
+            if (!failed)
+                Program.Log.Debug("Successfully posted commands to guild.");
+            else
+                Program.Log.Debug("Failed to post commands to guild. Watcher may still run but commands can't be received.");
         }
 
         internal static void UpdateGameServerStatusMessage(GameServerModel gameserver)
@@ -192,7 +205,7 @@ namespace VerdanskGameBot.Command
 
             GameServerModel theserver;
 
-            using (var db = new GameServersDb())
+            using (var db = new GameServerDb())
                 theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == servername);
 
             if (theserver == null)
@@ -218,7 +231,7 @@ namespace VerdanskGameBot.Command
 
             GameServerModel theserver;
 
-            using (var db = new GameServersDb())
+            using (var db = new GameServerDb())
                 theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == servername);
 
             if (theserver == null)
@@ -239,7 +252,7 @@ namespace VerdanskGameBot.Command
 
             try
             {
-                using (var db = new GameServersDb())
+                using (var db = new GameServerDb())
                     gameservers = db.GameServers.ToList();
             }
             catch (Exception)
@@ -285,7 +298,7 @@ namespace VerdanskGameBot.Command
             var guild = (cmd.Channel as SocketGuildChannel).Guild;
             var servername = options.First().Value as string;
 
-            using (var db = new GameServersDb())
+            using (var db = new GameServerDb())
             {
                 if (db.GameServers.Any(server => server.ServerName == servername))
                 {
@@ -316,7 +329,7 @@ namespace VerdanskGameBot.Command
         {
             GameServerModel theserver;
 
-            using (var db = new GameServersDb())
+            using (var db = new GameServerDb())
                 theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == options.First().Value as string);
 
             if (theserver == null)
@@ -342,7 +355,7 @@ namespace VerdanskGameBot.Command
             theserver.ChannelId = cmd.Channel.Id;
             theserver.MessageId = cmd.Channel.SendMessageAsync(embed: oldembed).Result.Id;
 
-            using (var db = new GameServersDb())
+            using (var db = new GameServerDb())
             {
                 db.Update(theserver);
                 db.SaveChanges();
@@ -364,7 +377,7 @@ namespace VerdanskGameBot.Command
         {
             GameServerModel theserver;
 
-            using (var db = new GameServersDb())
+            using (var db = new GameServerDb())
             {
                 theserver = db.GameServers.First(srv => srv.ServerName == options.First().Value as string);
 
@@ -540,7 +553,7 @@ namespace VerdanskGameBot.Command
                 
                 GameServerModel theserver;
 
-                using (var db = new GameServersDb())
+                using (var db = new GameServerDb())
                     theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == customid.Options[CustomIDs.ServernameOption]);
 
                 arg.RespondWithModalAsync(new ChangeServerModalBuilder(theserver).Build()).Wait();

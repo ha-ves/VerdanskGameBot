@@ -6,10 +6,19 @@ using System.Threading.Tasks;
 
 namespace VerdanskGameBot.Ext
 {
+    /// <summary>
+    /// Thrown when Object already exist
+    /// </summary>
     class AlreadyExistException : ApplicationException { }
 
+    /// <summary>
+    /// Thrown when gameserver port is not in valid format
+    /// </summary>
     class GamePortFormatException : FormatException { }
 
+    /// <summary>
+    /// Thrown when gameserver watcher update interval time is not in valid format
+    /// </summary>
     class UpdateIntervalFormatException : FormatException { }
 
 }

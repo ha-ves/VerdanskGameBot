@@ -2,21 +2,31 @@
 using Discord.Net;
 using Discord.WebSocket;
 using Jering.Javascript.NodeJS;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.CommandLine;
+using Microsoft.Extensions.Configuration.Json;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
 using NLog;
 using NLog.Config;
+using NLog.Fluent;
 using NLog.Targets;
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Security;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 using VerdanskGameBot.Command;
+using VerdanskGameBot.Ext;
 using VerdanskGameBot.GameServer;
 
 namespace VerdanskGameBot
@@ -24,6 +34,8 @@ namespace VerdanskGameBot
     class Program
     {
         #region Main & Logging
+
+        internal static IConfigurationRoot BotConfig = null;
 
         internal static Logger Log = LogManager.GetCurrentClassLogger();
 
@@ -38,24 +50,30 @@ namespace VerdanskGameBot
         private static void Main(string[] args)
         {
 #if DEBUG
-            Console.WriteLine("Waiting for debugger");
+            Log.Trace("Waiting for debugger");
             while (!Debugger.IsAttached) ;
-            Console.WriteLine("Debugger attached");
+            Log.Trace("Debugger attached");
 #endif
+            BotConfig = new ConfigurationBuilder().AddCommandLine(args).Build();
+
             LogManager.Configuration = new XmlLoggingConfiguration(
-                XmlReader.Create(Assembly.GetExecutingAssembly().GetManifestResourceStream(typeof(Program), "NLog.config"))
+                XmlReader.Create(GetRes("NLog.config"))
             );
 
-            Parallel.ForEach(LogManager.Configuration.AllTargets.Where(it => it.GetType() == typeof(FileTarget)), new ParallelOptions { CancellationToken = ExitCancel.Token }, target =>
-            {
-                var filepath = (target as FileTarget).FileName.Render(null);
-                if (File.Exists(filepath))
+            if (BotConfig["trace"] != null)
+                LogManager.Configuration.FindRuleByName("debuglog").EnableLoggingForLevel(LogLevel.Trace);
+
+            Parallel.ForEach(LogManager.Configuration.AllTargets.Where(it => it.GetType() == typeof(FileTarget)),
+                parallelOptions: new ParallelOptions { CancellationToken = ExitCancel.Token }, target =>
                 {
-                    var createTime = File.GetLastAccessTime(filepath);
-                    var splitpath = filepath.Split('.');
-                    File.Move(filepath, $"{splitpath[0]}_{createTime:yyyy-MM-dd_HH-mm-ss}.{splitpath[1]}");
-                }
-            });
+                    var filepath = (target as FileTarget).FileName.Render(null);
+                    if (File.Exists(filepath))
+                    {
+                        var createTime = File.GetLastAccessTime(filepath);
+                        var splitpath = filepath.Split('.');
+                        File.Move(filepath, $"{splitpath[0]}_{createTime:yyyy-MM-dd_HH-mm-ss}.{splitpath[1]}");
+                    }
+                });
 
             #region Pre-Start Debugging
 
@@ -67,8 +85,7 @@ namespace VerdanskGameBot
 
             #endregion
 
-
-            new Program().MainApp();
+            new Program().MainApp(args);
 
             Console.CancelKeyPress += Console_SIGINT;
             AppDomain.CurrentDomain.ProcessExit += Process_SIGTERM;
@@ -92,6 +109,11 @@ namespace VerdanskGameBot
             }
         }
 
+        public static Stream? GetRes(string? resName)
+        {
+            return Assembly.GetEntryAssembly().GetManifestResourceStream(typeof(Program), resName);
+        }
+
         private static void Process_SIGTERM(object sender, EventArgs e)
         {
             if(!IsExiting)
@@ -102,7 +124,7 @@ namespace VerdanskGameBot
         {
             ExitRequested();
 
-            Environment.Exit(0);
+            Environment.Exit((int)ExitCodes.OK);
         }
 
         private static void ExitRequested()
@@ -131,56 +153,13 @@ namespace VerdanskGameBot
             NLog.LogManager.Shutdown();
         }
 
-        private Task ClientLog(LogMessage msg)
-        {
-            var logmsg = msg.ToString(prependTimestamp: false);
-            switch (msg.Severity)
-            {
-                case LogSeverity.Critical:
-                    Log.Fatal(logmsg);
-                    break;
-                case LogSeverity.Error:
-                    Log.Error(logmsg);
-                    break;
-                case LogSeverity.Warning:
-                    Log.Warn(logmsg);
-                    break;
-                case LogSeverity.Info:
-                    Log.Info(logmsg);
-                    break;
-                case LogSeverity.Verbose:
-                    Log.Debug(logmsg);
-                    break;
-                case LogSeverity.Debug:
-                    Log.Trace(logmsg);
-                    break;
-                default:
-                    break;
-            }
-
-            return Task.CompletedTask;
-        }
         #endregion
 
-        private void MainApp()
+        private async void MainApp(string[] args)
         {
             Log.Info("");
             Log.Info("=====[ Starting Verdansk GameBot ]=====");
             Log.Info("");
-
-            try
-            {
-                StaticNodeJSService.InvokeFromStringAsync<string>(@"module.exports = (callback) => callback(null, 'NODEJSTEST');").Wait();
-            }
-            catch (Exception exc)
-            {
-                Log.Fatal(exc, "Can not start because NodeJS is not available. Please get from official release. (https://nodejs.org/en/download/current/)");
-                
-                Environment.Exit(-500);
-                return;
-            }
-
-            CheckGamedigInstall();
 
             var token = "";
             var isverbose = false;
@@ -189,46 +168,82 @@ namespace VerdanskGameBot
             {
                 if (!File.Exists("BotConfig.json"))
                 {
-                    Log.Debug("No BotConfig.json file found. Creating one...");
+                    Log.Trace("No BotConfig.json file found. Creating one...");
                     var file = File.Create("BotConfig.json");
-                    Assembly.GetExecutingAssembly().GetManifestResourceStream(this.GetType(), "BotConfig.json").CopyToAsync(file).Wait();
+                    Program.GetRes("BotConfig.json").CopyToAsync(file).Wait();
                     file.Close();
-                    Log.Debug("Created \"BotConfig.json\" file with default values.");
+                    Log.Trace("Created \"BotConfig.json\" file with default values.");
                 }
 
-                var config = new ConfigurationBuilder().AddJsonFile("BotConfig.json").Build();
+                BotConfig = new ConfigurationBuilder()
+                    .AddJsonFile("BotConfig.json")
+                    .AddCommandLine(args)
+                    .Build();
+                
+                token = BotConfig["BotToken"];
+                isverbose = bool.Parse(BotConfig["Verbose"]);
+                LocalIP = IPAddress.Parse(BotConfig["LocalIP"]);
 
-                token = config["BotToken"];
-                isverbose = bool.Parse(config["Verbose"]);
-                LocalIP = IPAddress.Parse(config["LocalIP"]);
+                if (isverbose)
+                    LogManager.Configuration.FindRuleByName("consolelog").EnableLoggingForLevel(LogLevel.Debug);
             }
             catch (Exception ex)
             {
-                Log.Fatal(ex, "Configuration File is not valid. Please delete \"BotConfig.json\" to reset.");
-                Environment.Exit(-500);
+                Log.Fatal(ex, "Configuration parameters or file is not valid. (Please delete \"BotConfig.json\" if you want to reset.)");
+                Environment.Exit(-(int)ExitCodes.BotConfigInvalid);
                 return;
             }
 
-            if (string.IsNullOrEmpty(token))
+            try
             {
-                Log.Fatal("No discord application token specified. Please specify \"BotToken\": \"<DISCORD_APP_TOKEN>\" in \"BotConfig.json\" in the same folder as executable.");
-                Environment.Exit(-500);
+                StaticNodeJSService.InvokeFromStringAsync<string>(@"module.exports = (callback) => callback(null, 'NODEJSTEST');").Wait();
+            }
+            catch (Exception exc)
+            {
+                Log.Fatal(exc, "Can not start because NodeJS is not available. Please get from official release. (https://nodejs.org/en/download/current/)");
+
+                Environment.Exit(-(int)ExitCodes.NodeJSNotAvail);
                 return;
             }
+
+            CheckGamedigInstall();
 
             BotClient = new DiscordSocketClient(new DiscordSocketConfig()
             {
-                LogLevel = isverbose ? LogSeverity.Debug : LogSeverity.Info,
+#if DEBUG
+                LogLevel = LogSeverity.Debug,
+#else
+                LogLevel = isverbose ? LogSeverity.Verbose : LogSeverity.Info,
+#endif
                 DefaultRetryMode = RetryMode.RetryTimeouts,
                 GatewayIntents = GatewayIntents.AllUnprivileged & ~(GatewayIntents.GuildInvites | GatewayIntents.GuildScheduledEvents)
             });
 
+            await DatabaseInit();
+
             BotClient.Log += ClientLog;
+            BotClient.LoggedIn += BotClient.StartAsync;
             BotClient.Ready += OnBotReady;
 
-            BotClient.SetActivityAsync(new Game("Refugees", ActivityType.Watching)).Wait();
-            BotClient.LoginAsync(TokenType.Bot, token).Wait();
-            BotClient.StartAsync().Wait();
+            await BotClient.SetActivityAsync(new Game("Refugees", ActivityType.Watching));
+            await BotClient.LoginAsync(TokenType.Bot, token);
+
+            new EventWaitHandle(false, EventResetMode.ManualReset).WaitOne(5000);
+            if (BotClient.LoginState != LoginState.LoggedIn)
+            {
+                if (string.IsNullOrEmpty(token))
+                {
+                    Log.Fatal($"No discord application token specified. Please specify \"BotToken\": \"<DISCORD_APP_TOKEN>\" in config file.");
+                    Environment.Exit(-(int)ExitCodes.BotTokenInvalid);
+                    return;
+                }
+                else
+                {
+                    Log.Fatal("Failed to login to discord. Something undetectable is wrong.");
+                    Environment.Exit(-(int)ExitCodes.BotLoginFailed);
+                    return;
+                }
+            }
         }
 
         private void CheckGamedigInstall()
@@ -236,7 +251,7 @@ namespace VerdanskGameBot
             try { StaticNodeJSService.InvokeFromStringAsync<string>(@"module.exports = (callback) => { require('gamedig'); callback(null, 'GAMEDIGTEST'); }").Wait(); }
             catch
             {
-                Log.Debug("{ gamedig } not available, trying to install...");
+                Log.Info("{ gamedig } not available, trying to install...");
 
                 var npmproc = new Process();
                 try
@@ -253,23 +268,98 @@ namespace VerdanskGameBot
                 catch (Exception ex)
                 {
                     Log.Fatal(ex, "Failed to install { gamedig }. Can not start because { gamedig } is not available. Try running 'npm install gamedig' manually." + (npmproc.ExitCode == 127 ? " (npm NOT FOUND)" : ""));
-
-                    Debugger.Break();
-
-                    Environment.Exit(-500);
+                    Environment.Exit(-(int)ExitCodes.GamedigMissing);
                     return;
                 }
             }
         }
 
-        private Task OnBotReady()
+        private async Task DatabaseInit()
         {
-            CommandService.StartService(BotClient);
-            GameServerWatcher.StartWatcher();
+            try
+            {
+                Log.Debug($"Configurating Database... Using {Enum.GetName(Enum.Parse<DbProviders>(BotConfig["DbProvider"]))} database");
 
+                using (var db = new GameServerDb())
+                {
+                    Log.Trace("[DB] Current Migration : " +
+                        $"{(await db.Database.GetAppliedMigrationsAsync(ExitCancel.Token)).LastOrDefault()}");
+                    var migrations = await db.Database.GetPendingMigrationsAsync(ExitCancel.Token);
+                    if (migrations.Any())
+                    {
+                        var str = migrations.Aggregate((a, b) => $"{a} -> {b}");
+                        Log.Trace($"[DB] Migration Pending : {str}");
+                        await db.Database.MigrateAsync(ExitCancel.Token);
+                    }
+                }
+            }
+            catch (ArgumentNullException e)
+            {
+                Log.Fatal(e, "Failed to Get Database configuration, please check provide valid database configuration in config file.");
+                Environment.Exit(-(int)ExitCodes.DbConfigInvalid);
+                return;
+            }
+            catch (Exception e)
+            {
+                Log.Warn(e, "Database configuration not finished.");
+            }
+        }
+
+        private async Task OnBotReady()
+        {
             Log.Info("");
             Log.Info("=====[ Verdansk GameBot Started ]=====");
             Log.Info("");
+#if DEBUG
+            using (var it = new GameServerDb())
+            {
+                it.Add(new GameServerModel()
+                {
+                    GameType = "przomboid",
+                    ServerName = "testarea",
+                    LastOnline = DateTimeOffset.MinValue,
+                    AddedBy = 1,
+                    ChannelId = 1,
+                    MessageId = 1,
+                    IP = IPAddress.IPv6Loopback,
+                    GamePort = 12727,
+                    AddedSince = DateTimeOffset.Now,
+                    LastUpdate ,
+                });
+                await it.SaveChangesAsync();
+            }
+
+            Debugger.Break();
+#endif
+            await CommandService.StartService(BotClient, ExitCancel.Token);
+            GameServerWatcher.StartWatcher();
+        }
+
+        private Task ClientLog(LogMessage msg)
+        {
+            switch (msg.Severity)
+            {
+                case LogSeverity.Critical:
+                    Log.Fatal(msg.Exception, $"{msg.Source} // {msg.Message}");
+                    break;
+                case LogSeverity.Error:
+                    Log.Error(msg.Exception, $"{msg.Source} // {msg.Message}");
+                    break;
+                case LogSeverity.Warning:
+                    Log.Warn(msg.Exception, $"{msg.Source} // {msg.Message}");
+                    break;
+                case LogSeverity.Info:
+                    Log.Info($"{msg.Source} // {msg.Message}");
+                    break;
+                case LogSeverity.Verbose:
+                    Log.Debug($"{msg.Source} // {msg.Message}");
+                    break;
+                case LogSeverity.Debug:
+                    Log.Trace($"{msg.Source} // {msg.Message}");
+                    break;
+                default:
+                    break;
+            }
 
             return Task.CompletedTask;
         }

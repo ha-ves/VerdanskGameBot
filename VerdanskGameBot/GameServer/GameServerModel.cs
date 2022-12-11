@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Newtonsoft.Json.Converters;
+using System;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Net;
@@ -6,10 +8,11 @@ using System.Security;
 
 namespace VerdanskGameBot.GameServer
 {
+    [Table("gameservers")]
     public class GameServerModel
     {
         /// <summary>
-        /// Primary Key
+        /// Primary Keyw3
         /// </summary>
         [Key, Column("id")]
         public ulong Id { get; set; }
@@ -51,14 +54,14 @@ namespace VerdanskGameBot.GameServer
         /// <summary>
         /// Last time the server is online
         /// </summary>
-        [Required, Column("last_online_time", TypeName = "INTEGER")]
-        public DateTimeOffset LastOnline { get; set; }
+        [Required, Column("last_online_time", TypeName = "longtext")]
+        public DateTimeOffset LastOnline { get; set; } = DateTimeOffset.MinValue;
 
         /// <summary>
         /// Link to game
         /// </summary>
         [Column("game_link"), MaxLength(100)]
-        public string GameLink { get; set; }
+        public string GameLink { get; set; } = "";
 
         /// <summary>
         /// Current number of players in game server
@@ -102,18 +105,18 @@ namespace VerdanskGameBot.GameServer
         /// <summary>
         /// Date the game server added
         /// </summary>
-        [Required, Column("added_since", TypeName = "INTEGER")]
+        [Required, Column("added_since", TypeName = "longtext")]
         public DateTimeOffset AddedSince { get; set; }
         /// <summary>
         /// Last time the game server checked
         /// </summary>
-        [Required, Column("last_update", TypeName = "INTEGER")]
-        public DateTimeOffset LastUpdate { get; set; }
+        [Required, Column("last_update", TypeName = "longtext")]
+        public DateTimeOffset LastUpdate { get; set; } = DateTimeOffset.MinValue;
         /// <summary>
         /// How often to check the game server
         /// </summary>
-        [Required, Column("update_interval", TypeName = "INTEGER")]
-        public TimeSpan UpdateInterval { get; set; }
+        [Required, Column("update_interval", TypeName = "longtext")]
+        public TimeSpan UpdateInterval { get; set; } = TimeSpan.FromHours(1);
 
         /// <summary>
         /// Extended configuration needs
@@ -125,6 +128,6 @@ namespace VerdanskGameBot.GameServer
         /// Note about the game server
         /// </summary>
         [Column("note")]
-        public string Note { get; set; }
+        public string Note { get; set; } = "";
     }
 }

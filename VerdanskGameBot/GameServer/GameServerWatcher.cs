@@ -1,6 +1,5 @@
 ﻿using Discord;
 using Discord.WebSocket;
-using DnsClient;
 using HtmlAgilityPack;
 using Jering.Javascript.NodeJS;
 using System;
@@ -17,6 +16,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using VerdanskGameBot.Command;
 using VerdanskGameBot.Ext;
 
 namespace VerdanskGameBot.GameServer
@@ -44,7 +44,7 @@ namespace VerdanskGameBot.GameServer
             {
                 Program.Log.Debug("No gameservers sqlite database file found. Creating one...");
                 var file = File.Create("gameservers.db");
-                Assembly.GetExecutingAssembly().GetManifestResourceStream(typeof(GameServerWatcher), "gameservers.db").CopyToAsync(file).Wait();
+                Program.GetRes("gameservers.db").CopyTo(file);
                 file.Close();
                 Program.Log.Debug("Created gameservers sqlite database file with default values.");
             }
@@ -52,12 +52,12 @@ namespace VerdanskGameBot.GameServer
             Watchers = new Dictionary<string, Tuple<Timer, ManualResetEvent>>();
             UpdateMutexes = new Dictionary<string, Mutex>();
 
-            using (var db = new GameServersDb())
+            using (var db = new GameServerDb())
             {
-                Parallel.ForEach(db.GameServers, gameServer =>
+                foreach (var gameServer in db.GameServers)
                 {
                     AddToWatcher(gameServer);
-                });
+                }
             }
 
             Program.Log.Debug("Game server watchers Started.");
@@ -65,7 +65,10 @@ namespace VerdanskGameBot.GameServer
             GlobalTimer = new Timer(dueTime: TimeSpan.Zero, period: TimeSpan.FromHours(1), state: null, callback: (obj) =>
             {
                 if (Program.BotClient.ConnectionState == ConnectionState.Disconnected)
-                    Environment.Exit(-500);
+                {
+                    Program.Log.Fatal("Bot disconnected from Discord and can't reconnect. Exiting.");
+                    Environment.Exit(-(int)ExitCodes.DiscordDisconnect);
+                }
 
                 Program.Log.Info($"Currently watching {Watchers.Count} game servers.");
             });
@@ -74,9 +77,9 @@ namespace VerdanskGameBot.GameServer
         private static void AddToWatcher(GameServerModel gameServer)
         {
             var timetoupdate = gameServer.LastUpdate + gameServer.UpdateInterval - DateTimeOffset.Now;
+            UpdateMutexes.Add(gameServer.ServerName, new Mutex(false));
             Watchers.Add(gameServer.ServerName, new Tuple<Timer, ManualResetEvent>(new Timer(callback: WatcherTimer_Elapsed, state: new Tuple<string, TimeSpan>(gameServer.ServerName, gameServer.UpdateInterval),
                 dueTime: timetoupdate <= TimeSpan.Zero ? TimeSpan.Zero : timetoupdate, period: gameServer.UpdateInterval), new ManualResetEvent(false)));
-            UpdateMutexes.Add(gameServer.ServerName, new Mutex(false));
             Program.Log.Trace($"Started watcher for game server {{ {gameServer.ServerName} }} | next update in {timetoupdate.TotalSeconds} s.");
         }
 
@@ -94,7 +97,7 @@ namespace VerdanskGameBot.GameServer
 
             GameServerModel gameserver;
 
-            using (var db = new GameServersDb())
+            using (var db = new GameServerDb())
                 gameserver = db.GameServers.First(gs => gs.ServerName == tupel.Item1);
 
             gameserver.LastUpdate = DateTimeOffset.Now;
@@ -104,7 +107,7 @@ namespace VerdanskGameBot.GameServer
             {
                 var attempts = 3;
                 gamedig = JsonDocument.Parse(StaticNodeJSService.InvokeFromStreamAsync<string>(
-                    Assembly.GetExecutingAssembly().GetManifestResourceStream(typeof(GameServerWatcher), "query.js"),
+                    Program.GetRes("query.js"),
                     args: new string[]
                     {
                         /* in case you're running the bot in the same system or internal NAT
@@ -164,7 +167,7 @@ namespace VerdanskGameBot.GameServer
                 }
             }
 
-            using (var db = new GameServersDb())
+            using (var db = new GameServerDb())
             {
                 db.Update(gameserver);
                 db.SaveChanges();
@@ -232,7 +235,7 @@ namespace VerdanskGameBot.GameServer
 
             GameServerModel theserver; IPAddress ip; ushort gameport; int update_interval;
 
-            using (var db = new GameServersDb())
+            using (var db = new GameServerDb())
                 theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == servername);
 
             PauseUpdate(theserver);
@@ -277,7 +280,7 @@ namespace VerdanskGameBot.GameServer
             theserver.LastOnline = DateTimeOffset.UnixEpoch;
             theserver.Note = notes;
 
-            using (var db = new GameServersDb())
+            using (var db = new GameServerDb())
             {
                 try
                 {
@@ -340,7 +343,7 @@ namespace VerdanskGameBot.GameServer
 
             Program.Log.Debug($"Resolved hostname \"{host_ip}\" having IP : {ip}");
 
-            using (var db = new GameServersDb())
+            using (var db = new GameServerDb())
                 if (db.GameServers.Any(server => server.IP == ip && server.GamePort == gameport))
                 {
                     var existexc = new AlreadyExistException();
@@ -367,7 +370,7 @@ namespace VerdanskGameBot.GameServer
                 Note = notes,
             };
 
-            using (var db = new GameServersDb())
+            using (var db = new GameServerDb())
             {
                 try
                 {
@@ -393,19 +396,21 @@ namespace VerdanskGameBot.GameServer
 
         internal static void RemoveWatcher(GameServerModel theserver) => Watchers[theserver.ServerName].Item1.Dispose();
 
+        /// <summary>
+        /// Parses the GameServer Input data
+        /// </summary>
+        /// <param name="modal">source discord modal</param>
+        /// <param name="host_ip">gameserver host/ip</param>
+        /// <param name="ip">resulting IP</param>
+        /// <param name="gameport">resulting gameport</param>
+        /// <param name="update_interval">resulting watcher interval</param>
+        /// <exception cref="GamePortFormatException"></exception>
+        /// <exception cref="UpdateIntervalFormatException">Thrown when update interval time is invalid</exception>
         private static void ParseHostIPGamePort(SocketModal modal, string host_ip, out IPAddress ip, out ushort gameport, out int update_interval)
         {
             if (!IPAddress.TryParse(host_ip, out ip))
-                /* 
-                 * Use system default DNS resolver
-                 */
                 ip = Dns.GetHostAddresses(host_ip).First();
-            /* 
-             * In case you want to use your own or specific DNS service,
-             * uncomment the line below
-             */
-            //ip = new LookupClient(new[] { new IPEndPoint(/* DNS provider IP Address */, /* DNS Query Port (usually 53) */), NameServer.Cloudflare, NameServer.Cloudflare2, NameServer.GooglePublicDns, NameServer.GooglePublicDns2 }).QueryAsync(host_ip, QueryType.A).Result.Answers.AddressRecords().FirstOrDefault().Address;
-
+            
             if (!ushort.TryParse(modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.HostIPPort.ToString("d")).Value.Split(':')[1], out gameport)) throw new GamePortFormatException();
             if (!int.TryParse(modal.Data.Components.First(cmp => cmp.CustomId == CustomIDs.UpdateInterval.ToString("d")).Value, out update_interval)) throw new UpdateIntervalFormatException();
         }
