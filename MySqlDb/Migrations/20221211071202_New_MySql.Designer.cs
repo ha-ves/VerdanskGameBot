@@ -3,11 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using VerdanskGameBot.GameServer;
+using VerdanskGameBot.GameServer.Db;
 
 #nullable disable
 
-namespace VerdanskGameBot.Migrations
+namespace MySqlDb.Migrations
 {
     [DbContext(typeof(GameServerDb))]
     [Migration("20221211071202_New_MySql")]

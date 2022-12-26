@@ -2,6 +2,6 @@
   "BotToken": "",
   "Verbose": false,
   "LocalIP": "127.0.0.1",
-  "DbProvider": 1,
+  "DbProvider": 0,
   "ConnectionString": "Data Source=gameservers.db;"
 }

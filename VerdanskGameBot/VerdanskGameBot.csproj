@@ -36,7 +36,6 @@
     <None Remove="gameservers.db" />
     <None Remove="NLog.config" />
     <None Remove="package-lock.json" />
-    <None Remove="package.json" />
     <None Remove="query.js" />
   </ItemGroup>
 
@@ -50,8 +49,7 @@
     <EmbeddedResource Include="NLog.config">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </EmbeddedResource>
-    <EmbeddedResource Include="package-lock.json" />
-    <EmbeddedResource Include="package.json" />
+    <Content Include="package-lock.json" />
     <EmbeddedResource Include="query.js">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </EmbeddedResource>
@@ -60,59 +58,30 @@
   <ItemGroup>
     <PackageReference Include="Discord.Net" Version="3.8.1" />
     <PackageReference Include="HtmlAgilityPack" Version="1.11.46" />
-    <PackageReference Include="Jering.Javascript.NodeJS" Version="6.3.1" />
+    <PackageReference Include="Jering.Javascript.NodeJS" Version="6.*" />
     <PackageReference Include="MessagePack" Version="2.4.59" />
     <PackageReference Include="MessagePackAnalyzer" Version="2.4.59">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="6.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="6.*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="6.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="6.*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="6.*">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="7.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="6.*" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="6.*" />
-    <PackageReference Include="NLog" Version="5.1.0" />
+    <PackageReference Include="NLog" Version="5.*" />
     <PackageReference Include="NodaTime" Version="3.1.6" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="6.0.7" />
-    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="6.0.2" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="GameServer\GameServer.Context.tt">
-      <Generator>TextTemplatingFileGenerator</Generator>
-    </None>
-    <None Update="GameServer\GameServer.tt">
-      <Generator>TextTemplatingFileGenerator</Generator>
-    </None>
-    <None Update="GameServer\Model1.Context.tt">
-      <Generator>TextTemplatingFileGenerator</Generator>
-      <LastGenOutput>Model1.Context.cs</LastGenOutput>
-    </None>
-    <None Update="GameServer\Model1.tt">
-      <Generator>TextTemplatingFileGenerator</Generator>
-      <LastGenOutput>Model1.cs</LastGenOutput>
-    </None>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="6.*" />
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="6.*" />
   </ItemGroup>
 
   <ItemGroup>
     <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Update="GameServer\Model1.Context.cs">
-      <DesignTime>True</DesignTime>
-      <AutoGen>True</AutoGen>
-      <DependentUpon>Model1.Context.tt</DependentUpon>
-    </Compile>
-    <Compile Update="GameServer\Model1.cs">
-      <DesignTime>True</DesignTime>
-      <AutoGen>True</AutoGen>
-      <DependentUpon>Model1.tt</DependentUpon>
-    </Compile>
   </ItemGroup>
 
 </Project>

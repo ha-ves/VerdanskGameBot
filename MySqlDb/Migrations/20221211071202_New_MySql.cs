@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace VerdanskGameBot.Migrations
+namespace MySqlDb.Migrations
 {
     public partial class New_MySql : Migration
     {

@@ -1,32 +1,33 @@
-﻿using Newtonsoft.Json.Converters;
+﻿using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json.Converters;
 using System;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Security;
 
 namespace VerdanskGameBot.GameServer
 {
-    [Table("gameservers")]
+    [Table("GameServers")]
     public class GameServerModel
     {
         /// <summary>
         /// Primary Keyw3
         /// </summary>
-        [Key, Column("id")]
         public ulong Id { get; set; }
 
         /// <summary>
         /// Game Type
         /// </summary>
-        [Column("type"), MaxLength(22)]
+        [Required, MaxLength(22)]
         public string GameType { get; set; }
 
         /// <summary>
         /// Private server name (by Admin)
         /// </summary>
-        [Required, Column("name"), MaxLength(22)]
+        [Required, MaxLength(22)]
         public string ServerName { get; set; }
         /// <summary>
         /// Display Name to show on watch list
@@ -54,13 +55,13 @@ namespace VerdanskGameBot.GameServer
         /// <summary>
         /// Last time the server is online
         /// </summary>
-        [Required, Column("last_online_time", TypeName = "longtext")]
-        public DateTimeOffset LastOnline { get; set; } = DateTimeOffset.MinValue;
+        [Column("LastOnlineUTC")]
+        public DateTimeOffset LastOnline { get; set; }
 
         /// <summary>
         /// Link to game
         /// </summary>
-        [Column("game_link"), MaxLength(100)]
+        [MaxLength(100)]
         public string GameLink { get; set; } = "";
 
         /// <summary>
@@ -78,44 +79,44 @@ namespace VerdanskGameBot.GameServer
         /// <summary>
         /// Who added the server
         /// </summary>
-        [Required, Column("added_by")]
+        [Required]
         public ulong AddedBy { get; set; }
         /// <summary>
         /// Channel where to show the watch list
         /// </summary>
-        [Required, Column("chan_id")]
+        [Required]
         public ulong ChannelId { get; set; }
         /// <summary>
         /// Message to show the watch list
         /// </summary>
-        [Required, Column("msg_id")]
+        [Required]
         public ulong MessageId { get; set; }
 
         /// <summary>
         /// IP Address of the game server
         /// </summary>
-        [Required, Column("game_ip")]
+        [Required]
         public IPAddress IP { get; set; }
         /// <summary>
         /// Port to join the game server
         /// </summary>
-        [Required, Column("game_port")]
+        [Required]
         public ushort GamePort { get; set; }
 
         /// <summary>
         /// Date the game server added
         /// </summary>
-        [Required, Column("added_since", TypeName = "longtext")]
+        [Required, Column("AddedSinceUTC")]
         public DateTimeOffset AddedSince { get; set; }
         /// <summary>
         /// Last time the game server checked
         /// </summary>
-        [Required, Column("last_update", TypeName = "longtext")]
-        public DateTimeOffset LastUpdate { get; set; } = DateTimeOffset.MinValue;
+        [Required, Column("LastUpdateUTC")]
+        public DateTimeOffset LastUpdate { get; set; }
         /// <summary>
         /// How often to check the game server
         /// </summary>
-        [Required, Column("update_interval", TypeName = "longtext")]
+        [Required]
         public TimeSpan UpdateInterval { get; set; } = TimeSpan.FromHours(1);
 
         /// <summary>

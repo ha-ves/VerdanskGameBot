@@ -2,11 +2,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using VerdanskGameBot.GameServer;
+using VerdanskGameBot.GameServer.Db;
 
 #nullable disable
 
-namespace VerdanskGameBot.Migrations
+namespace MySqlDb.Migrations
 {
     [DbContext(typeof(GameServerDb))]
     partial class GameServerDbModelSnapshot : ModelSnapshot

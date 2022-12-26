@@ -18,6 +18,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using VerdanskGameBot.Command;
 using VerdanskGameBot.Ext;
+using VerdanskGameBot.GameServer.Db;
 
 namespace VerdanskGameBot.GameServer
 {
@@ -52,7 +53,7 @@ namespace VerdanskGameBot.GameServer
             Watchers = new Dictionary<string, Tuple<Timer, ManualResetEvent>>();
             UpdateMutexes = new Dictionary<string, Mutex>();
 
-            using (var db = new GameServerDb())
+            using (var db = GameServerDb.GetContext())
             {
                 foreach (var gameServer in db.GameServers)
                 {
@@ -97,7 +98,7 @@ namespace VerdanskGameBot.GameServer
 
             GameServerModel gameserver;
 
-            using (var db = new GameServerDb())
+            using (var db = GameServerDb.GetContext())
                 gameserver = db.GameServers.First(gs => gs.ServerName == tupel.Item1);
 
             gameserver.LastUpdate = DateTimeOffset.Now;
@@ -167,7 +168,7 @@ namespace VerdanskGameBot.GameServer
                 }
             }
 
-            using (var db = new GameServerDb())
+            using (var db = GameServerDb.GetContext())
             {
                 db.Update(gameserver);
                 db.SaveChanges();
@@ -235,7 +236,7 @@ namespace VerdanskGameBot.GameServer
 
             GameServerModel theserver; IPAddress ip; ushort gameport; int update_interval;
 
-            using (var db = new GameServerDb())
+            using (var db = GameServerDb.GetContext())
                 theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == servername);
 
             PauseUpdate(theserver);
@@ -280,7 +281,7 @@ namespace VerdanskGameBot.GameServer
             theserver.LastOnline = DateTimeOffset.UnixEpoch;
             theserver.Note = notes;
 
-            using (var db = new GameServerDb())
+            using (var db = GameServerDb.GetContext())
             {
                 try
                 {
@@ -343,7 +344,7 @@ namespace VerdanskGameBot.GameServer
 
             Program.Log.Debug($"Resolved hostname \"{host_ip}\" having IP : {ip}");
 
-            using (var db = new GameServerDb())
+            using (var db = GameServerDb.GetContext())
                 if (db.GameServers.Any(server => server.IP == ip && server.GamePort == gameport))
                 {
                     var existexc = new AlreadyExistException();
@@ -370,7 +371,7 @@ namespace VerdanskGameBot.GameServer
                 Note = notes,
             };
 
-            using (var db = new GameServerDb())
+            using (var db = GameServerDb.GetContext())
             {
                 try
                 {

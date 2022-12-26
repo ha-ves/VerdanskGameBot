@@ -13,6 +13,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using VerdanskGameBot.Ext;
 using VerdanskGameBot.GameServer;
+using VerdanskGameBot.GameServer.Db;
 
 namespace VerdanskGameBot.Command
 {
@@ -205,7 +206,7 @@ namespace VerdanskGameBot.Command
 
             GameServerModel theserver;
 
-            using (var db = new GameServerDb())
+            using (var db = GameServerDb.GetContext())
                 theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == servername);
 
             if (theserver == null)
@@ -231,7 +232,7 @@ namespace VerdanskGameBot.Command
 
             GameServerModel theserver;
 
-            using (var db = new GameServerDb())
+            using (var db = GameServerDb.GetContext())
                 theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == servername);
 
             if (theserver == null)
@@ -252,7 +253,7 @@ namespace VerdanskGameBot.Command
 
             try
             {
-                using (var db = new GameServerDb())
+                using (var db = GameServerDb.GetContext())
                     gameservers = db.GameServers.ToList();
             }
             catch (Exception)
@@ -298,7 +299,7 @@ namespace VerdanskGameBot.Command
             var guild = (cmd.Channel as SocketGuildChannel).Guild;
             var servername = options.First().Value as string;
 
-            using (var db = new GameServerDb())
+            using (var db = GameServerDb.GetContext())
             {
                 if (db.GameServers.Any(server => server.ServerName == servername))
                 {
@@ -329,7 +330,7 @@ namespace VerdanskGameBot.Command
         {
             GameServerModel theserver;
 
-            using (var db = new GameServerDb())
+            using (var db = GameServerDb.GetContext())
                 theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == options.First().Value as string);
 
             if (theserver == null)
@@ -355,7 +356,7 @@ namespace VerdanskGameBot.Command
             theserver.ChannelId = cmd.Channel.Id;
             theserver.MessageId = cmd.Channel.SendMessageAsync(embed: oldembed).Result.Id;
 
-            using (var db = new GameServerDb())
+            using (var db = GameServerDb.GetContext())
             {
                 db.Update(theserver);
                 db.SaveChanges();
@@ -377,7 +378,7 @@ namespace VerdanskGameBot.Command
         {
             GameServerModel theserver;
 
-            using (var db = new GameServerDb())
+            using (var db = GameServerDb.GetContext())
             {
                 theserver = db.GameServers.First(srv => srv.ServerName == options.First().Value as string);
 
@@ -553,7 +554,7 @@ namespace VerdanskGameBot.Command
                 
                 GameServerModel theserver;
 
-                using (var db = new GameServerDb())
+                using (var db = GameServerDb.GetContext())
                     theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == customid.Options[CustomIDs.ServernameOption]);
 
                 arg.RespondWithModalAsync(new ChangeServerModalBuilder(theserver).Build()).Wait();

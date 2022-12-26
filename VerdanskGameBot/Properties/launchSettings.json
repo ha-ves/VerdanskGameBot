@@ -1,8 +1,7 @@
 {
   "profiles": {
     "VerdanskGameBot": {
-      "commandName": "Project",
-      "commandLineArgs": "--ConnStr Server=192.168.1.4;Uid=gamebot;Pwd=GAMEBOT;\r\n--DbType 1"
+      "commandName": "Project"
     }
   }
 }

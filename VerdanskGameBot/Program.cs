@@ -28,13 +28,12 @@ using System.Xml;
 using VerdanskGameBot.Command;
 using VerdanskGameBot.Ext;
 using VerdanskGameBot.GameServer;
+using VerdanskGameBot.GameServer.Db;
 
 namespace VerdanskGameBot
 {
     class Program
     {
-        #region Main & Logging
-
         internal static IConfigurationRoot BotConfig = null;
 
         internal static Logger Log = LogManager.GetCurrentClassLogger();
@@ -46,6 +45,9 @@ namespace VerdanskGameBot
         internal static bool IsExiting = false, IsConnected = false;
 
         internal static IPAddress LocalIP;
+
+
+        #region Main & Logging
 
         private static void Main(string[] args)
         {
@@ -109,7 +111,7 @@ namespace VerdanskGameBot
             }
         }
 
-        public static Stream? GetRes(string? resName)
+        public static Stream GetRes(string resName)
         {
             return Assembly.GetEntryAssembly().GetManifestResourceStream(typeof(Program), resName);
         }
@@ -224,12 +226,13 @@ namespace VerdanskGameBot
             BotClient.Log += ClientLog;
             BotClient.LoggedIn += BotClient.StartAsync;
             BotClient.Ready += OnBotReady;
+            BotClient.Disconnected += BotClient_Disconnected;
 
             await BotClient.SetActivityAsync(new Game("Refugees", ActivityType.Watching));
             await BotClient.LoginAsync(TokenType.Bot, token);
 
             new EventWaitHandle(false, EventResetMode.ManualReset).WaitOne(5000);
-            if (BotClient.LoginState != LoginState.LoggedIn)
+            if (BotClient.Rest.LoginState != LoginState.LoggedIn)
             {
                 if (string.IsNullOrEmpty(token))
                 {
@@ -244,6 +247,13 @@ namespace VerdanskGameBot
                     return;
                 }
             }
+        }
+
+        private Task BotClient_Disconnected(Exception arg)
+        {
+            Debugger.Break();
+
+            return Task.CompletedTask;
         }
 
         private void CheckGamedigInstall()
@@ -280,7 +290,7 @@ namespace VerdanskGameBot
             {
                 Log.Debug($"Configurating Database... Using {Enum.GetName(Enum.Parse<DbProviders>(BotConfig["DbProvider"]))} database");
 
-                using (var db = new GameServerDb())
+                using (var db = GameServerDb.GetContext())
                 {
                     Log.Trace("[DB] Current Migration : " +
                         $"{(await db.Database.GetAppliedMigrationsAsync(ExitCancel.Token)).LastOrDefault()}");
@@ -295,13 +305,9 @@ namespace VerdanskGameBot
             }
             catch (ArgumentNullException e)
             {
-                Log.Fatal(e, "Failed to Get Database configuration, please check provide valid database configuration in config file.");
+                Log.Fatal(e, "Database configuration failed. Please check and provide valid database configuration in config file.");
                 Environment.Exit(-(int)ExitCodes.DbConfigInvalid);
                 return;
-            }
-            catch (Exception e)
-            {
-                Log.Warn(e, "Database configuration not finished.");
             }
         }
 
@@ -311,7 +317,7 @@ namespace VerdanskGameBot
             Log.Info("=====[ Verdansk GameBot Started ]=====");
             Log.Info("");
 #if DEBUG
-            using (var it = new GameServerDb())
+            using (var it = GameServerDb.GetContext())
             {
                 it.Add(new GameServerModel()
                 {
@@ -324,7 +330,6 @@ namespace VerdanskGameBot
                     IP = IPAddress.IPv6Loopback,
                     GamePort = 12727,
                     AddedSince = DateTimeOffset.Now,
-                    LastUpdate ,
                 });
                 await it.SaveChangesAsync();
             }
