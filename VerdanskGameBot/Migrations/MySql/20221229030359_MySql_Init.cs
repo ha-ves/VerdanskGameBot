@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace VerdanskGameBot.Migrations.MySql
 {
-    public partial class Init : Migration
+    public partial class MySql_Init : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -16,31 +16,41 @@ namespace VerdanskGameBot.Migrations.MySql
                 name: "GameServers",
                 columns: table => new
                 {
-                    Id = table.Column<ulong>(type: "bigint unsigned", nullable: false),
-                    ServerName = table.Column<string>(type: "varchar(22)", maxLength: 22, nullable: false)
+                    ServerId = table.Column<string>(type: "varchar(64)", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     GameType = table.Column<string>(type: "varchar(22)", maxLength: 22, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    LastOnlineUTC = table.Column<DateTimeOffset>(type: "datetime(6)", nullable: false),
+                    ServerName = table.Column<string>(type: "varchar(22)", maxLength: 22, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    LastOnlineUTC = table.Column<DateTime>(type: "datetime(6)", nullable: false),
                     GameLink = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    AddedBy = table.Column<ulong>(type: "bigint unsigned", nullable: false),
-                    ChannelId = table.Column<ulong>(type: "bigint unsigned", nullable: false),
-                    MessageId = table.Column<ulong>(type: "bigint unsigned", nullable: false),
+                    AddedBy = table.Column<string>(type: "varchar(64)", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ChannelId = table.Column<string>(type: "varchar(64)", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    MessageId = table.Column<string>(type: "varchar(64)", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
                     IP = table.Column<string>(type: "varchar(45)", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     GamePort = table.Column<ushort>(type: "smallint unsigned", nullable: false),
-                    AddedSinceUTC = table.Column<DateTimeOffset>(type: "datetime(6)", nullable: false),
-                    LastUpdateUTC = table.Column<DateTimeOffset>(type: "datetime(6)", nullable: false),
+                    AddedSinceUTC = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    LastUpdateUTC = table.Column<DateTime>(type: "datetime(6)", nullable: false),
                     UpdateInterval = table.Column<TimeSpan>(type: "time(6)", nullable: false),
                     note = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_GameServers", x => new { x.Id, x.ServerName });
+                    table.PrimaryKey("PK_GameServers", x => x.ServerId);
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ServerName",
+                table: "GameServers",
+                column: "ServerName",
+                unique: true);
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)

@@ -1,7 +1,8 @@
 {
   "profiles": {
     "VerdanskGameBot": {
-      "commandName": "Project"
+      "commandName": "Project",
+      "commandLineArgs": "--version --trace"
     }
   }
 }

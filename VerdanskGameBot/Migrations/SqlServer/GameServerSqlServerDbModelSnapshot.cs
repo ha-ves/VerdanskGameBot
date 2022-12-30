@@ -24,22 +24,21 @@ namespace VerdanskGameBot.Migrations.SqlServer
 
             modelBuilder.Entity("VerdanskGameBot.GameServer.GameServerModel", b =>
                 {
-                    b.Property<decimal>("Id")
-                        .HasColumnType("decimal(20,0)");
+                    b.Property<string>("ServerId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("nvarchar(64)");
 
-                    b.Property<string>("ServerName")
-                        .HasMaxLength(22)
-                        .HasColumnType("nvarchar(22)");
+                    b.Property<string>("AddedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(64)");
 
-                    b.Property<decimal>("AddedBy")
-                        .HasColumnType("decimal(20,0)");
-
-                    b.Property<DateTimeOffset>("AddedSince")
-                        .HasColumnType("datetimeoffset")
+                    b.Property<DateTime>("AddedSince")
+                        .HasColumnType("datetime2")
                         .HasColumnName("AddedSinceUTC");
 
-                    b.Property<decimal>("ChannelId")
-                        .HasColumnType("decimal(20,0)");
+                    b.Property<string>("ChannelId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<string>("GameLink")
                         .HasMaxLength(100)
@@ -57,27 +56,41 @@ namespace VerdanskGameBot.Migrations.SqlServer
                         .IsRequired()
                         .HasColumnType("nvarchar(45)");
 
-                    b.Property<DateTimeOffset>("LastOnline")
-                        .HasColumnType("datetimeoffset")
+                    b.Property<string>("LastModifiedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("LastModifiedSince")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("LastModifiedSinceUTC");
+
+                    b.Property<DateTime>("LastOnline")
+                        .HasColumnType("datetime2")
                         .HasColumnName("LastOnlineUTC");
 
-                    b.Property<DateTimeOffset>("LastUpdate")
-                        .HasColumnType("datetimeoffset")
+                    b.Property<DateTime>("LastUpdate")
+                        .HasColumnType("datetime2")
                         .HasColumnName("LastUpdateUTC");
 
-                    b.Property<decimal>("MessageId")
-                        .HasColumnType("decimal(20,0)");
+                    b.Property<string>("MessageId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<string>("Note")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("note");
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ServerName")
+                        .IsRequired()
+                        .HasMaxLength(22)
+                        .HasColumnType("nvarchar(22)");
 
                     b.Property<TimeSpan>("UpdateInterval")
                         .HasColumnType("time");
 
-                    b.HasKey("Id", "ServerName");
+                    b.HasKey("ServerId");
 
-                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id", "ServerName"));
+                    b.HasIndex(new[] { "ServerName" }, "IX_ServerName")
+                        .IsUnique();
 
                     b.ToTable("GameServers");
                 });

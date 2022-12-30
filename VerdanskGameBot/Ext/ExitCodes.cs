@@ -10,11 +10,10 @@ namespace VerdanskGameBot.Ext
     public enum ExitCodes
     {
         OK = 0,
-        ErrCode = 500,
-        
+
         #region Internal mechanics errors
 
-        NodeJSNotAvail,
+        NodeJSNotAvail = 501,
         GamedigMissing,
         BotLoginFailed,
         BotNoGuild,
@@ -24,6 +23,7 @@ namespace VerdanskGameBot.Ext
 
         #region Configuration Errors
 
+        CmdArgsInvalid = 551,
         BotConfigInvalid,
         BotTokenInvalid,
         ConnStringInvalid,

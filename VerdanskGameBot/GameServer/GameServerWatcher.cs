@@ -53,7 +53,7 @@ namespace VerdanskGameBot.GameServer
             Watchers = new Dictionary<string, Tuple<Timer, ManualResetEvent>>();
             UpdateMutexes = new Dictionary<string, Mutex>();
 
-            using (var db = GameServerDb.GetContext())
+            using (var db = new GameServerDb())
             {
                 foreach (var gameServer in db.GameServers)
                 {
@@ -77,7 +77,7 @@ namespace VerdanskGameBot.GameServer
 
         private static void AddToWatcher(GameServerModel gameServer)
         {
-            var timetoupdate = gameServer.LastUpdate + gameServer.UpdateInterval - DateTimeOffset.Now;
+            var timetoupdate = (gameServer.LastUpdate.HasValue ? gameServer.LastUpdate.Value : DateTimeOffset.MinValue) + gameServer.UpdateInterval - DateTimeOffset.Now;
             UpdateMutexes.Add(gameServer.ServerName, new Mutex(false));
             Watchers.Add(gameServer.ServerName, new Tuple<Timer, ManualResetEvent>(new Timer(callback: WatcherTimer_Elapsed, state: new Tuple<string, TimeSpan>(gameServer.ServerName, gameServer.UpdateInterval),
                 dueTime: timetoupdate <= TimeSpan.Zero ? TimeSpan.Zero : timetoupdate, period: gameServer.UpdateInterval), new ManualResetEvent(false)));
@@ -98,7 +98,7 @@ namespace VerdanskGameBot.GameServer
 
             GameServerModel gameserver;
 
-            using (var db = GameServerDb.GetContext())
+            using (var db = new GameServerDb())
                 gameserver = db.GameServers.First(gs => gs.ServerName == tupel.Item1);
 
             gameserver.LastUpdate = DateTimeOffset.Now;
@@ -111,24 +111,25 @@ namespace VerdanskGameBot.GameServer
                     Program.GetRes("query.js"),
                     args: new string[]
                     {
-                        /* in case you're running the bot in the same system or internal NAT
-                         * ex: i run the bot in a public facing VPS that acts as router with NAT,
-                         * the game servers use VPN to connect to the VPS and get public ip with port forwarding
+                        /* in case you're running the bot in the same system
+                         * or on same internal network with public ip behind NAT,
+                         * declare the actual game server IP on the internal network.
                          * 
-                         * ex architecture:
-                         * ~~~~~~~~~~~~~~~~~INTERNET~~~~~~~~~~~~~~~~
-                         * ----------------Public IP----------------
-                         * --------------------|--------------------
-                         * -------------------VPS-------------------
-                         * ------------NAT & Port Forward-----------
-                         * -------------------=|=-------------------
-                         * -------v=======Internal VPN======v-------
-                         * ------=|=----------=|=----------=|=------
-                         * --GameServer1--GameServer2--GameServer3--
+                         * example:
+                         * ~~~~~~~~~~~~~~~~~~INTERNET~~~~~~~~~~~~~~~~~~
+                         *                  <PublicIP>
+                         *                      ||
+                         *                    Router
+                         * =============NAT & Port Forward============= < Below this line is internal network
+                         *                      ||                      < 192.168.1.0/24
+                         *      vv==============||==============vv
+                         *      ||              ||              ||
+                         * GameServer 1    GameServer 2    GameServer 3
+                         * 192.168.1.68    192.168.1.69    192.168.1.70
                          */
                         NetworkInterface.GetAllNetworkInterfaces().FirstOrDefault(
                             intf => intf.GetIPProperties().UnicastAddresses.FirstOrDefault(
-                                ipinfo => ipinfo.Address.Equals(gameserver.IP)) != null) == null ? gameserver.IP.ToString() : Program.LocalIP.ToString(),
+                                ipinfo => ipinfo.Address.Equals(gameserver.IP)) != null) == null ? gameserver.IP.ToString() : Program.LAN_IP.ToString(),
                         gameserver.GameType == "valve" ? "przomboid" : gameserver.GameType,
                         gameserver.GamePort.ToString(),
                         attempts.ToString(),
@@ -168,7 +169,7 @@ namespace VerdanskGameBot.GameServer
                 }
             }
 
-            using (var db = GameServerDb.GetContext())
+            using (var db = new GameServerDb())
             {
                 db.Update(gameserver);
                 db.SaveChanges();
@@ -202,7 +203,7 @@ namespace VerdanskGameBot.GameServer
 
             UpdateMutexes[gameServer.ServerName].ReleaseMutex();
 
-            var timetoupdate = gameServer.LastUpdate + gameServer.UpdateInterval - DateTimeOffset.Now;
+            var timetoupdate = (gameServer.LastUpdate.HasValue ? gameServer.LastUpdate.Value : DateTimeOffset.MinValue) + gameServer.UpdateInterval - DateTimeOffset.Now;
 
             Watchers[gameServer.ServerName].Item1.Change(dueTime: timetoupdate <= TimeSpan.Zero ? TimeSpan.Zero : timetoupdate, period: gameServer.UpdateInterval);
 
@@ -236,7 +237,7 @@ namespace VerdanskGameBot.GameServer
 
             GameServerModel theserver; IPAddress ip; ushort gameport; int update_interval;
 
-            using (var db = GameServerDb.GetContext())
+            using (var db = new GameServerDb())
                 theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == servername);
 
             PauseUpdate(theserver);
@@ -281,7 +282,7 @@ namespace VerdanskGameBot.GameServer
             theserver.LastOnline = DateTimeOffset.UnixEpoch;
             theserver.Note = notes;
 
-            using (var db = GameServerDb.GetContext())
+            using (var db = new GameServerDb())
             {
                 try
                 {
@@ -344,7 +345,7 @@ namespace VerdanskGameBot.GameServer
 
             Program.Log.Debug($"Resolved hostname \"{host_ip}\" having IP : {ip}");
 
-            using (var db = GameServerDb.GetContext())
+            using (var db = new GameServerDb())
                 if (db.GameServers.Any(server => server.IP == ip && server.GamePort == gameport))
                 {
                     var existexc = new AlreadyExistException();
@@ -371,7 +372,7 @@ namespace VerdanskGameBot.GameServer
                 Note = notes,
             };
 
-            using (var db = GameServerDb.GetContext())
+            using (var db = new GameServerDb())
             {
                 try
                 {

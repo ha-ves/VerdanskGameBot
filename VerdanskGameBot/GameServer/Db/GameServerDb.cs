@@ -18,7 +18,7 @@ using VerdanskGameBot.Ext;
 
 namespace VerdanskGameBot.GameServer.Db
 {
-    public abstract class GameServerDb : DbContext
+    public class GameServerDb : DbContext
     {
         internal DbSet<GameServerModel> GameServers { get; set; }
 
@@ -30,107 +30,66 @@ namespace VerdanskGameBot.GameServer.Db
         {
         }
 
-        public static GameServerDb GetContext()
-        {
-            switch (Enum.Parse<DbProviders>(Program.BotConfig["DbProvider"]))
-            {
-                case DbProviders.SQLite:
-                    return null;
-                case DbProviders.MySql:
-                    return new GameServerMySqlDb();
-                case DbProviders.SqlServer:
-                    return new GameServerSqlServerDb();
-                case DbProviders.PostgreSql:
-                    return null;
-                // Not used yet, should be used when watching hundreds of gameservers
-                //case DbProviders.InMemory:
-                //    optionsBuilder.UseInMemoryDatabase("GameServers");
-                //    break;
-                default:
-                    return null;
-            }
-        }
-
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             if (optionsBuilder.IsConfigured)
                 return;
 
-            //try
-            //{
-                var connstr = Program.BotConfig["ConnectionString"];
-                var dbprovider = Enum.Parse<DbProviders>(Program.BotConfig["DbProvider"]);
-                //var dbasm = Assembly.LoadFrom(Enum.GetName(dbprovider) + "Db.dll").FullName;
-                switch (dbprovider)
-                {
-                    case DbProviders.SQLite:
-                        optionsBuilder.UseSqlite(connstr);
-                        break;
-                    case DbProviders.MySql:
-                        optionsBuilder.UseMySql(connstr, ServerVersion.AutoDetect(connstr)/*, oa => oa.MigrationsAssembly(dbasm)*/);
-                        break;
-                    case DbProviders.SqlServer:
-                        optionsBuilder.UseSqlServer(connstr/*, oa => oa.MigrationsAssembly(dbasm)*/);
-                        break;
-                    case DbProviders.PostgreSql:
-                        optionsBuilder.UseNpgsql(connstr);
-                        break;
-                    // Not used yet, should be used when watching hundreds of gameservers
-                    //case DbProviders.InMemory:
-                    //    optionsBuilder.UseInMemoryDatabase("GameServers");
-                    //    break;
-                    default:
-                        break;
-                }
-            //}
-            //catch (Exception ex)
-            //{
-            //    Program.Log.Fatal(ex, "Database connection invalid. Please check in config file.");
-            //    Environment.Exit(-(int)ExitCodes.ConnStringInvalid);
-            //    return;
-            //}
+            var connstr = Program.BotConfig["ConnectionString"];
+            var dbprovider = Enum.Parse<DbProviders>(Program.BotConfig["DbProvider"]);
+            switch (dbprovider)
+            {
+                case DbProviders.SQLite:
+                    optionsBuilder.UseSqlite(connstr);
+                    break;
+                case DbProviders.MySql:
+                    optionsBuilder.UseMySql(connstr, ServerVersion.AutoDetect(connstr));
+                    break;
+                case DbProviders.SqlServer:
+                    optionsBuilder.UseSqlServer(connstr);
+                    break;
+                case DbProviders.PostgreSql:
+                    optionsBuilder.UseNpgsql(connstr);
+                    break;
+                default:
+                    break;
+            }
 
             base.OnConfiguring(optionsBuilder);
         }
 
-        //protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
-        //{
-        //    configurationBuilder
-        //        .Properties<DateTimeOffset>()
-        //        .HaveConversion<DateTimeOffsetToDateTimeConverter>();
+        protected override void ConfigureConventions(ModelConfigurationBuilder configBuilder)
+        {
+            configBuilder.Properties<DateTimeOffset>()
+                .HaveConversion<DateTimeOffsetToDateTimeConverter>();
 
-        //    base.ConfigureConventions(configurationBuilder);
-        //}
+            configBuilder.Properties<ulong>()
+                .HaveConversion<string>();
+
+            base.ConfigureConventions(configBuilder);
+        }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<GameServerModel>()
-                .HasKey(gs => new { gs.Id, gs.ServerName })
-                .IsClustered();
+            var gs = modelBuilder.Entity<GameServerModel>();
+
+            gs.Property(x => x.LastOnline)
+                .HasDefaultValue(DateTimeOffset.MinValue);
+
+            gs.Property(x => x.GameLink)
+                .IsRequired(false);
+            gs.Property(x => x.LastModifiedBy)
+                .IsRequired(false);
+            gs.Property(x => x.LastModifiedSince)
+                .IsRequired(false);
+            gs.Property(x => x.LastUpdate)
+                .IsRequired(false);
+            gs.Property(x => x.Note)
+                .IsRequired(false);
+            gs.Property(x => x.Remarks)
+                .IsRequired(false);
 
             base.OnModelCreating(modelBuilder);
-        }
-    }
-
-    internal class GameServerSqlServerDb : GameServerDb
-    {
-        public GameServerSqlServerDb(DbContextOptions options) : base(options)
-        {
-        }
-
-        public GameServerSqlServerDb() : base()
-        {
-        }
-    }
-
-    internal class GameServerMySqlDb : GameServerDb
-    {
-        public GameServerMySqlDb(DbContextOptions options) : base(options)
-        {
-        }
-
-        public GameServerMySqlDb() : base()
-        {
         }
     }
 }

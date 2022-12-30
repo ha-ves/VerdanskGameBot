@@ -11,8 +11,8 @@ using VerdanskGameBot.GameServer.Db;
 namespace VerdanskGameBot.Migrations.MySql
 {
     [DbContext(typeof(GameServerMySqlDb))]
-    [Migration("20221221034112_Init")]
-    partial class Init
+    [Migration("20221229030359_MySql_Init")]
+    partial class MySql_Init
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -23,22 +23,21 @@ namespace VerdanskGameBot.Migrations.MySql
 
             modelBuilder.Entity("VerdanskGameBot.GameServer.GameServerModel", b =>
                 {
-                    b.Property<ulong>("Id")
-                        .HasColumnType("bigint unsigned");
+                    b.Property<string>("ServerId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(64)");
 
-                    b.Property<string>("ServerName")
-                        .HasMaxLength(22)
-                        .HasColumnType("varchar(22)");
+                    b.Property<string>("AddedBy")
+                        .IsRequired()
+                        .HasColumnType("varchar(64)");
 
-                    b.Property<ulong>("AddedBy")
-                        .HasColumnType("bigint unsigned");
-
-                    b.Property<DateTimeOffset>("AddedSince")
+                    b.Property<DateTime>("AddedSince")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("AddedSinceUTC");
 
-                    b.Property<ulong>("ChannelId")
-                        .HasColumnType("bigint unsigned");
+                    b.Property<string>("ChannelId")
+                        .IsRequired()
+                        .HasColumnType("varchar(64)");
 
                     b.Property<string>("GameLink")
                         .HasMaxLength(100)
@@ -56,26 +55,34 @@ namespace VerdanskGameBot.Migrations.MySql
                         .IsRequired()
                         .HasColumnType("varchar(45)");
 
-                    b.Property<DateTimeOffset>("LastOnline")
+                    b.Property<DateTime>("LastOnline")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("LastOnlineUTC");
 
-                    b.Property<DateTimeOffset>("LastUpdate")
+                    b.Property<DateTime>("LastUpdate")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("LastUpdateUTC");
 
-                    b.Property<ulong>("MessageId")
-                        .HasColumnType("bigint unsigned");
+                    b.Property<string>("MessageId")
+                        .IsRequired()
+                        .HasColumnType("varchar(64)");
 
                     b.Property<string>("Note")
                         .HasColumnType("longtext")
                         .HasColumnName("note");
 
+                    b.Property<string>("ServerName")
+                        .IsRequired()
+                        .HasMaxLength(22)
+                        .HasColumnType("varchar(22)");
+
                     b.Property<TimeSpan>("UpdateInterval")
                         .HasColumnType("time(6)");
 
-                    b.HasKey("Id", "ServerName")
-                        .HasAnnotation("SqlServer:Clustered", true);
+                    b.HasKey("ServerId");
+
+                    b.HasIndex(new[] { "ServerName" }, "IX_ServerName")
+                        .IsUnique();
 
                     b.ToTable("GameServers");
                 });

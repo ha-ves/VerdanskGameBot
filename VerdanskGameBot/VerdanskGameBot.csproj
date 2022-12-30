@@ -5,12 +5,15 @@
     <TargetFramework>net6.0</TargetFramework>
     <UserSecretsId>79540f67-cfd6-4338-857a-f37c08a32dec</UserSecretsId>
     <PlatformTarget>x64</PlatformTarget>
-    <Version>0.21.2-net6</Version>
+    <Version>0.2.7-dev</Version>
     <Authors>Haves Irfan (ha-ves)</Authors>
     <Company>Tekat</Company>
-    <Product>Verdansk Game Bot</Product>
+    <Product>Verdansk Game Bot | Game Server Watcher</Product>
     <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
 	<GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+	<Title>Verdansk Game Bot | Game Server Watcher</Title>
+	  <SourceRevisionId>$([System.DateTime]::UtcNow.ToString("yyyyMMddHHmmss"))</SourceRevisionId>
+	  <Copyright>Copyright (c) $([System.DateTime]::UtcNow.ToString("yyyy")) Haves/Tekat. All rights reserved.</Copyright>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -82,6 +85,10 @@
 
   <ItemGroup>
     <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Migrations\" />
   </ItemGroup>
 
 </Project>

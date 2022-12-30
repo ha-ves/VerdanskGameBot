@@ -13,7 +13,10 @@ using NLog;
 using NLog.Config;
 using NLog.Fluent;
 using NLog.Targets;
+using Npgsql;
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -34,36 +37,88 @@ namespace VerdanskGameBot
 {
     class Program
     {
-        internal static IConfigurationRoot BotConfig = null;
+        #region Internal
 
-        internal static Logger Log = LogManager.GetCurrentClassLogger();
+        internal static Logger Log { get; } = LogManager.GetCurrentClassLogger();
+        internal static CancellationTokenSource ExitCancel { get; } = new CancellationTokenSource();
+        internal static bool IsExiting { get; private set; } = false;
+        internal static string Version { get; private set; } = "";
 
-        internal static DiscordSocketClient BotClient;
+        #endregion
 
-        internal static CancellationTokenSource ExitCancel = new CancellationTokenSource();
+        #region Bot Info
 
-        internal static bool IsExiting = false, IsConnected = false;
+        internal static IConfigurationRoot BotConfig { get; private set; } = null;
+        internal static DiscordSocketClient BotClient { get; private set; }
+        internal static IPAddress LAN_IP { get; private set; }
+        internal static bool IsConnected { get => BotClient.ConnectionState == ConnectionState.Connected; }
 
-        internal static IPAddress LocalIP;
+        #endregion
 
-
-        #region Main & Logging
+        #region Entry point main()
 
         private static void Main(string[] args)
         {
 #if DEBUG
-            Log.Trace("Waiting for debugger");
+            Console.WriteLine("Waiting for debugger");
             while (!Debugger.IsAttached) ;
-            Log.Trace("Debugger attached");
+            Console.WriteLine("Debugger attached");
 #endif
-            BotConfig = new ConfigurationBuilder().AddCommandLine(args).Build();
-
             LogManager.Configuration = new XmlLoggingConfiguration(
-                XmlReader.Create(GetRes("NLog.config"))
-            );
+                    XmlReader.Create(GetRes("NLog.config"))
+                );
 
-            if (BotConfig["trace"] != null)
+            #region CmdOptions
+
+            var regArgs = new[]
+            {
+                "--help",
+                "--version",
+                "--trace"
+            };
+
+            if (args.Contains("--version"))
+            {
+                var assembly = Assembly.GetEntryAssembly();
+                var info = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion.Split('+');
+                Version = 'v' + info.FirstOrDefault();
+                var buildtime = DateTime.ParseExact(info.Last(), "yyyyMMddHHmmss", null);
+
+                var verStr = $"{assembly.GetCustomAttribute<AssemblyProductAttribute>().Product} {Version}" + Environment.NewLine
+                    + $"{assembly.GetCustomAttribute<AssemblyCopyrightAttribute>().Copyright}" + Environment.NewLine
+                    + $"Built ({buildtime:F})." + Environment.NewLine;
+
+                Console.WriteLine(verStr);
+            }
+
+            if (args.Contains("--help") || !args.Any(a => regArgs.Contains(a)))
+            {
+                if (args.Any(a => !regArgs.Contains(a)))
+                    Console.WriteLine($"Invalid Args : '{args.Where(a => !regArgs.Contains(a)).Aggregate((a, b) => a + ' ' + b)}'" + Environment.NewLine);
+
+                var helpStr = $"Usage : {Assembly.GetEntryAssembly().GetName().Name} [Args]" + Environment.NewLine
+                    + Environment.NewLine
+                    + "Args :" + Environment.NewLine
+                    + "    --help     : Prints this help screen" + Environment.NewLine
+                    + "    --version  : Prints version" + Environment.NewLine
+                    + "    --trace    : Enable most verbose/indepth logging" + Environment.NewLine
+                    + Environment.NewLine
+                    + "Args also available via BotConfig.json file next to executable";
+
+                Console.WriteLine(helpStr);
+
+                Environment.Exit(-(int)ExitCodes.CmdArgsInvalid);
+            }
+
+            if (args.Contains("--trace"))
+            {
+                LogManager.Configuration.FindRuleByName("consolelog").SetLoggingLevels(LogLevel.Trace, LogLevel.Fatal);
                 LogManager.Configuration.FindRuleByName("debuglog").EnableLoggingForLevel(LogLevel.Trace);
+
+                LogManager.ReconfigExistingLoggers();
+            }
+
+            #endregion
 
             Parallel.ForEach(LogManager.Configuration.AllTargets.Where(it => it.GetType() == typeof(FileTarget)),
                 parallelOptions: new ParallelOptions { CancellationToken = ExitCancel.Token }, target =>
@@ -74,6 +129,7 @@ namespace VerdanskGameBot
                         var createTime = File.GetLastAccessTime(filepath);
                         var splitpath = filepath.Split('.');
                         File.Move(filepath, $"{splitpath[0]}_{createTime:yyyy-MM-dd_HH-mm-ss}.{splitpath[1]}");
+                        return;
                     }
                 });
 
@@ -92,7 +148,7 @@ namespace VerdanskGameBot
             Console.CancelKeyPress += Console_SIGINT;
             AppDomain.CurrentDomain.ProcessExit += Process_SIGTERM;
 
-            if (args.Length > 0 && args[0] == "service")
+            if (BotConfig.GetSection("service") != null)
             {
                 Log.Debug("App IS NOT Console Interactive (system service)");
                 new ManualResetEvent(false).WaitOne();
@@ -157,34 +213,44 @@ namespace VerdanskGameBot
 
         #endregion
 
-        private async void MainApp(string[] args)
+        private void MainApp(string[] args)
         {
             Log.Info("");
             Log.Info("=====[ Starting Verdansk GameBot ]=====");
+            Log.Info($"               {Version}");
             Log.Info("");
 
             var token = "";
             var isverbose = false;
 
+            #region Loading Configuration
+
+            Log.Trace("Loading Configuration...");
             try
             {
                 if (!File.Exists("BotConfig.json"))
                 {
                     Log.Trace("No BotConfig.json file found. Creating one...");
                     var file = File.Create("BotConfig.json");
-                    Program.GetRes("BotConfig.json").CopyToAsync(file).Wait();
+                    GetRes("BotConfig.json").CopyToAsync(file).Wait();
                     file.Close();
                     Log.Trace("Created \"BotConfig.json\" file with default values.");
+                }
+                else
+                {
+                    Log.Trace("BotCOnfig.json exists");
                 }
 
                 BotConfig = new ConfigurationBuilder()
                     .AddJsonFile("BotConfig.json")
-                    .AddCommandLine(args)
                     .Build();
                 
                 token = BotConfig["BotToken"];
+                Log.Trace("BotToken Available.");
                 isverbose = bool.Parse(BotConfig["Verbose"]);
-                LocalIP = IPAddress.Parse(BotConfig["LocalIP"]);
+                Log.Trace("Verbose Available.");
+                LAN_IP = IPAddress.Parse(BotConfig["LocalIP"]);
+                Log.Trace("LocalIP Available.");
 
                 if (isverbose)
                     LogManager.Configuration.FindRuleByName("consolelog").EnableLoggingForLevel(LogLevel.Debug);
@@ -195,7 +261,13 @@ namespace VerdanskGameBot
                 Environment.Exit(-(int)ExitCodes.BotConfigInvalid);
                 return;
             }
+            Log.Trace("Loaded Configuration.");
 
+            #endregion
+
+            #region Configuring NodeJS
+
+            Log.Trace("Configuring NodeJS ...");
             try
             {
                 StaticNodeJSService.InvokeFromStringAsync<string>(@"module.exports = (callback) => callback(null, 'NODEJSTEST');").Wait();
@@ -207,57 +279,13 @@ namespace VerdanskGameBot
                 Environment.Exit(-(int)ExitCodes.NodeJSNotAvail);
                 return;
             }
+            Log.Trace("Configured NodeJS.");
 
-            CheckGamedigInstall();
+            #endregion
 
-            BotClient = new DiscordSocketClient(new DiscordSocketConfig()
-            {
-#if DEBUG
-                LogLevel = LogSeverity.Debug,
-#else
-                LogLevel = isverbose ? LogSeverity.Verbose : LogSeverity.Info,
-#endif
-                DefaultRetryMode = RetryMode.RetryTimeouts,
-                GatewayIntents = GatewayIntents.AllUnprivileged & ~(GatewayIntents.GuildInvites | GatewayIntents.GuildScheduledEvents)
-            });
+            #region Configuring gamedig
 
-            await DatabaseInit();
-
-            BotClient.Log += ClientLog;
-            BotClient.LoggedIn += BotClient.StartAsync;
-            BotClient.Ready += OnBotReady;
-            BotClient.Disconnected += BotClient_Disconnected;
-
-            await BotClient.SetActivityAsync(new Game("Refugees", ActivityType.Watching));
-            await BotClient.LoginAsync(TokenType.Bot, token);
-
-            new EventWaitHandle(false, EventResetMode.ManualReset).WaitOne(5000);
-            if (BotClient.Rest.LoginState != LoginState.LoggedIn)
-            {
-                if (string.IsNullOrEmpty(token))
-                {
-                    Log.Fatal($"No discord application token specified. Please specify \"BotToken\": \"<DISCORD_APP_TOKEN>\" in config file.");
-                    Environment.Exit(-(int)ExitCodes.BotTokenInvalid);
-                    return;
-                }
-                else
-                {
-                    Log.Fatal("Failed to login to discord. Something undetectable is wrong.");
-                    Environment.Exit(-(int)ExitCodes.BotLoginFailed);
-                    return;
-                }
-            }
-        }
-
-        private Task BotClient_Disconnected(Exception arg)
-        {
-            Debugger.Break();
-
-            return Task.CompletedTask;
-        }
-
-        private void CheckGamedigInstall()
-        {
+            Log.Trace("Configuring gamedig ...");
             try { StaticNodeJSService.InvokeFromStringAsync<string>(@"module.exports = (callback) => { require('gamedig'); callback(null, 'GAMEDIGTEST'); }").Wait(); }
             catch
             {
@@ -282,24 +310,46 @@ namespace VerdanskGameBot
                     return;
                 }
             }
-        }
+            Log.Trace("Configured gamedig.");
 
-        private async Task DatabaseInit()
-        {
+            #endregion
+
+            #region Configuring Discord Bot
+
+            Log.Trace("Configuring Discord Bot ...");
+            BotClient = new DiscordSocketClient(new DiscordSocketConfig()
+            {
+#if DEBUG
+                LogLevel = LogSeverity.Debug,
+#else
+                LogLevel = isverbose ? LogSeverity.Verbose : LogSeverity.Info,
+#endif
+                DefaultRetryMode = RetryMode.RetryTimeouts,
+                GatewayIntents = GatewayIntents.AllUnprivileged & ~(GatewayIntents.GuildInvites | GatewayIntents.GuildScheduledEvents)
+            });
+            Log.Trace("BotToken Available.");
+
+            Log.Trace("Configured Discord Bot.");
+
+            #endregion
+
+            #region Configuring Database
+
+            Log.Trace("Configuring Database ...");
             try
             {
-                Log.Debug($"Configurating Database... Using {Enum.GetName(Enum.Parse<DbProviders>(BotConfig["DbProvider"]))} database");
+                Log.Debug($"Using {Enum.GetName(Enum.Parse<DbProviders>(BotConfig["DbProvider"]))} database");
 
-                using (var db = GameServerDb.GetContext())
+                using (var db = new GameServerContextFactory().CreateDbContext(new[] { "--ConnStr", BotConfig["ConnectionString"], "--DbType", BotConfig["DbProvider"] }))
                 {
                     Log.Trace("[DB] Current Migration : " +
-                        $"{(await db.Database.GetAppliedMigrationsAsync(ExitCancel.Token)).LastOrDefault()}");
-                    var migrations = await db.Database.GetPendingMigrationsAsync(ExitCancel.Token);
+                        $"{db.Database.GetAppliedMigrations().LastOrDefault()}");
+                    var migrations = db.Database.GetPendingMigrations();
                     if (migrations.Any())
                     {
                         var str = migrations.Aggregate((a, b) => $"{a} -> {b}");
                         Log.Trace($"[DB] Migration Pending : {str}");
-                        await db.Database.MigrateAsync(ExitCancel.Token);
+                        db.Database.Migrate();
                     }
                 }
             }
@@ -309,6 +359,45 @@ namespace VerdanskGameBot
                 Environment.Exit(-(int)ExitCodes.DbConfigInvalid);
                 return;
             }
+            Log.Trace("Configured Database.");
+
+            #endregion
+
+            #region Starting Discord Bot
+
+            Log.Trace("Starting Discord Bot ...");
+
+            BotClient.Log += ClientLog;
+            BotClient.LoggedIn += BotClient.StartAsync;
+            BotClient.Ready += OnBotReady;
+            BotClient.Disconnected += OnBotDisconnect;
+
+            BotClient.SetActivityAsync(new Game("Refugees", ActivityType.Watching)).Wait();
+            BotClient.LoginAsync(TokenType.Bot, token).Wait();
+
+            new EventWaitHandle(false, EventResetMode.ManualReset).WaitOne(5000);
+            if (BotClient.Rest.LoginState != LoginState.LoggedIn)
+            {
+                if (string.IsNullOrEmpty(token))
+                {
+                    Log.Fatal($"No discord application token specified. Please specify \"BotToken\": \"<DISCORD_APP_TOKEN>\" in config file.");
+                    Environment.Exit(-(int)ExitCodes.BotTokenInvalid);
+                    return;
+                }
+                else
+                {
+                    Log.Fatal("Failed to login to discord. Something undetectable is wrong.");
+                    Environment.Exit(-(int)ExitCodes.BotLoginFailed);
+                    return;
+                }
+            }
+
+            #endregion
+        }
+
+        private Task OnBotDisconnect(Exception arg)
+        {
+            return Task.CompletedTask;
         }
 
         private async Task OnBotReady()
@@ -317,7 +406,7 @@ namespace VerdanskGameBot
             Log.Info("=====[ Verdansk GameBot Started ]=====");
             Log.Info("");
 #if DEBUG
-            using (var it = GameServerDb.GetContext())
+            using (var it = new GameServerDb())
             {
                 it.Add(new GameServerModel()
                 {

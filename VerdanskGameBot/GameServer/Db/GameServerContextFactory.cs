@@ -38,16 +38,34 @@ namespace VerdanskGameBot.GameServer.Db
                     break;
                 case DbProviders.PostgreSql:
                     optionsBuilder.UseNpgsql(connstr);
+                    db = new GameServerPostgreSqlDb(optionsBuilder.Options);
                     break;
-                // Not used yet, should be used when watching hundreds of gameservers
-                //case DbProviders.InMemory:
-                //    optionsBuilder.UseInMemoryDatabase("GameServers");
-                //    break;
                 default:
                     throw new ArgumentException("Database Type (--DbType) not choosen");
             }
 
             return db;
+        }
+    }
+
+    internal class GameServerPostgreSqlDb : GameServerDb
+    {
+        public GameServerPostgreSqlDb(DbContextOptions options) : base(options)
+        {
+        }
+    }
+
+    internal class GameServerSqlServerDb : GameServerDb
+    {
+        public GameServerSqlServerDb(DbContextOptions options) : base(options)
+        {
+        }
+    }
+
+    internal class GameServerMySqlDb : GameServerDb
+    {
+        public GameServerMySqlDb(DbContextOptions options) : base(options)
+        {
         }
     }
 }

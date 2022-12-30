@@ -11,7 +11,7 @@ namespace VerdanskGameBot.Command
 {
     internal class ChangeServerModalBuilder : ModalBuilder
     {
-        internal ChangeServerModalBuilder(GameServerModel gameserver)
+        internal ChangeServerModalBuilder(GameServer.GameServerModel gameserver)
         {
             WithTitle($"Change \"{gameserver.ServerName}\" game server");
             WithCustomId(new CustomID

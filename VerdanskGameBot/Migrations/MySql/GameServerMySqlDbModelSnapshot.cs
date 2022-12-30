@@ -21,22 +21,21 @@ namespace VerdanskGameBot.Migrations.MySql
 
             modelBuilder.Entity("VerdanskGameBot.GameServer.GameServerModel", b =>
                 {
-                    b.Property<ulong>("Id")
-                        .HasColumnType("bigint unsigned");
+                    b.Property<string>("ServerId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(64)");
 
-                    b.Property<string>("ServerName")
-                        .HasMaxLength(22)
-                        .HasColumnType("varchar(22)");
+                    b.Property<string>("AddedBy")
+                        .IsRequired()
+                        .HasColumnType("varchar(64)");
 
-                    b.Property<ulong>("AddedBy")
-                        .HasColumnType("bigint unsigned");
-
-                    b.Property<DateTimeOffset>("AddedSince")
+                    b.Property<DateTime>("AddedSince")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("AddedSinceUTC");
 
-                    b.Property<ulong>("ChannelId")
-                        .HasColumnType("bigint unsigned");
+                    b.Property<string>("ChannelId")
+                        .IsRequired()
+                        .HasColumnType("varchar(64)");
 
                     b.Property<string>("GameLink")
                         .HasMaxLength(100)
@@ -54,28 +53,36 @@ namespace VerdanskGameBot.Migrations.MySql
                         .IsRequired()
                         .HasColumnType("varchar(45)");
 
-                    b.Property<DateTimeOffset>("LastOnline")
+                    b.Property<DateTime>("LastOnline")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("LastOnlineUTC");
 
-                    b.Property<DateTimeOffset>("LastUpdate")
+                    b.Property<DateTime>("LastUpdate")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("LastUpdateUTC");
 
-                    b.Property<ulong>("MessageId")
-                        .HasColumnType("bigint unsigned");
+                    b.Property<string>("MessageId")
+                        .IsRequired()
+                        .HasColumnType("varchar(64)");
 
                     b.Property<string>("Note")
                         .HasColumnType("longtext")
                         .HasColumnName("note");
 
+                    b.Property<string>("ServerName")
+                        .IsRequired()
+                        .HasMaxLength(22)
+                        .HasColumnType("varchar(22)");
+
                     b.Property<TimeSpan>("UpdateInterval")
                         .HasColumnType("time(6)");
 
-                    b.HasKey("Id", "ServerName")
-                        .HasAnnotation("SqlServer:Clustered", true);
+                    b.HasKey("ServerId");
 
-                    b.ToTable("GameServers");
+                    b.HasIndex(new[] { "ServerName" }, "IX_ServerName")
+                        .IsUnique();
+
+                    b.ToTable("GameServers", (string)null);
                 });
 #pragma warning restore 612, 618
         }

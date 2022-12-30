@@ -72,7 +72,7 @@ namespace VerdanskGameBot.Command
                 Program.Log.Debug("Failed to post commands to guild. Watcher may still run but commands can't be received.");
         }
 
-        internal static void UpdateGameServerStatusMessage(GameServerModel gameserver)
+        internal static void UpdateGameServerStatusMessage(GameServer.GameServerModel gameserver)
         {
             var chan = (Program.BotClient.GetChannelAsync(gameserver.ChannelId).Result as ITextChannel);
 
@@ -204,9 +204,9 @@ namespace VerdanskGameBot.Command
         {
             var servername = options.First().Value as string;
 
-            GameServerModel theserver;
+            GameServer.GameServerModel theserver;
 
-            using (var db = GameServerDb.GetContext())
+            using (var db = new GameServerDb())
                 theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == servername);
 
             if (theserver == null)
@@ -230,9 +230,9 @@ namespace VerdanskGameBot.Command
         {
             var servername = options.First().Value as string;
 
-            GameServerModel theserver;
+            GameServer.GameServerModel theserver;
 
-            using (var db = GameServerDb.GetContext())
+            using (var db = new GameServerDb())
                 theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == servername);
 
             if (theserver == null)
@@ -249,11 +249,11 @@ namespace VerdanskGameBot.Command
         {
             var guild = (cmd.Channel as SocketGuildChannel).Guild;
 
-            List<GameServerModel> gameservers;
+            List<GameServer.GameServerModel> gameservers;
 
             try
             {
-                using (var db = GameServerDb.GetContext())
+                using (var db = new GameServerDb())
                     gameservers = db.GameServers.ToList();
             }
             catch (Exception)
@@ -299,7 +299,7 @@ namespace VerdanskGameBot.Command
             var guild = (cmd.Channel as SocketGuildChannel).Guild;
             var servername = options.First().Value as string;
 
-            using (var db = GameServerDb.GetContext())
+            using (var db = new GameServerDb())
             {
                 if (db.GameServers.Any(server => server.ServerName == servername))
                 {
@@ -328,9 +328,9 @@ namespace VerdanskGameBot.Command
 
         private static void GameServerMoverHandler(DiscordSocketClient bot, SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
         {
-            GameServerModel theserver;
+            GameServer.GameServerModel theserver;
 
-            using (var db = GameServerDb.GetContext())
+            using (var db = new GameServerDb())
                 theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == options.First().Value as string);
 
             if (theserver == null)
@@ -356,7 +356,7 @@ namespace VerdanskGameBot.Command
             theserver.ChannelId = cmd.Channel.Id;
             theserver.MessageId = cmd.Channel.SendMessageAsync(embed: oldembed).Result.Id;
 
-            using (var db = GameServerDb.GetContext())
+            using (var db = new GameServerDb())
             {
                 db.Update(theserver);
                 db.SaveChanges();
@@ -376,9 +376,9 @@ namespace VerdanskGameBot.Command
 
         private static void GameServerRemovalHandler(DiscordSocketClient bot, SocketSlashCommand cmd, IReadOnlyCollection<SocketSlashCommandDataOption> options)
         {
-            GameServerModel theserver;
+            GameServer.GameServerModel theserver;
 
-            using (var db = GameServerDb.GetContext())
+            using (var db = new GameServerDb())
             {
                 theserver = db.GameServers.First(srv => srv.ServerName == options.First().Value as string);
 
@@ -551,10 +551,10 @@ namespace VerdanskGameBot.Command
             if (customid.Options[CustomIDs.ButtonOption] == CustomIDs.TryAgainButton.ToString("d"))
             {
                 Program.Log.Debug($"User {arg.User} requested retry...");
-                
-                GameServerModel theserver;
 
-                using (var db = GameServerDb.GetContext())
+                GameServer.GameServerModel theserver;
+
+                using (var db = new GameServerDb())
                     theserver = db.GameServers.FirstOrDefault(srv => srv.ServerName == customid.Options[CustomIDs.ServernameOption]);
 
                 arg.RespondWithModalAsync(new ChangeServerModalBuilder(theserver).Build()).Wait();

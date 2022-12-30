@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using VerdanskGameBot.GameServer.Db;
 
 namespace VerdanskGameBot.GameServer
 {
@@ -18,8 +19,9 @@ namespace VerdanskGameBot.GameServer
             var rand = new Random((int)(DateTimeOffset.Now - server.AddedSince).Ticks);
             WithColor(new Color(rand.Next(255), rand.Next(255), rand.Next(255)));
 
+            var lastonline = (server.LastOnline.HasValue ? server.LastOnline.Value : DateTimeOffset.MinValue);
             AddField(server.IsOnline ? ":green_circle: Online" : ":red_circle: Offline", (server.IsOnline ? "Server is Online" : "Last online : " +
-                (server.LastOnline > server.AddedSince ? $"<t:{server.LastOnline.ToUnixTimeSeconds()}:R>" : "Never")) + $"{Environment.NewLine}⠀", true);
+                (server.LastOnline > server.AddedSince ? $"<t:{lastonline.ToUnixTimeSeconds()}:R>" : "Never")) + $"{Environment.NewLine}⠀", true);
             AddField("IP Address", server.IP.ToString(), true);
             AddField("Game Port", server.GamePort.ToString(), true);
 

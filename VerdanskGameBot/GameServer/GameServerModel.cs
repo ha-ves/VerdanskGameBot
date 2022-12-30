@@ -11,12 +11,14 @@ using System.Security;
 namespace VerdanskGameBot.GameServer
 {
     [Table("GameServers")]
+    [Index(nameof(ServerName), IsUnique = true, Name = "IX_ServerName")]
     public class GameServerModel
     {
         /// <summary>
-        /// Primary Keyw3
+        /// Primary Key
         /// </summary>
-        public ulong Id { get; set; }
+        [Key]
+        public ulong ServerId { get; set; }
 
         /// <summary>
         /// Game Type
@@ -29,6 +31,7 @@ namespace VerdanskGameBot.GameServer
         /// </summary>
         [Required, MaxLength(22)]
         public string ServerName { get; set; }
+
         /// <summary>
         /// Display Name to show on watch list
         /// </summary>
@@ -52,17 +55,18 @@ namespace VerdanskGameBot.GameServer
         /// </summary>
         [NotMapped]
         public bool IsOnline { get; set; } = false;
+
         /// <summary>
         /// Last time the server is online
         /// </summary>
         [Column("LastOnlineUTC")]
-        public DateTimeOffset LastOnline { get; set; }
+        public DateTimeOffset? LastOnline { get; set; }
 
         /// <summary>
         /// Link to game
         /// </summary>
         [MaxLength(100)]
-        public string GameLink { get; set; } = "";
+        public string GameLink { get; set; }
 
         /// <summary>
         /// Current number of players in game server
@@ -81,11 +85,19 @@ namespace VerdanskGameBot.GameServer
         /// </summary>
         [Required]
         public ulong AddedBy { get; set; }
+
+        /// <summary>
+        /// Date the game server added
+        /// </summary>
+        [Required, Column("AddedSinceUTC")]
+        public DateTimeOffset AddedSince { get; set; }
+
         /// <summary>
         /// Channel where to show the watch list
         /// </summary>
         [Required]
         public ulong ChannelId { get; set; }
+
         /// <summary>
         /// Message to show the watch list
         /// </summary>
@@ -97,6 +109,7 @@ namespace VerdanskGameBot.GameServer
         /// </summary>
         [Required]
         public IPAddress IP { get; set; }
+
         /// <summary>
         /// Port to join the game server
         /// </summary>
@@ -104,31 +117,36 @@ namespace VerdanskGameBot.GameServer
         public ushort GamePort { get; set; }
 
         /// <summary>
-        /// Date the game server added
+        /// Last user to edit the game server entry
         /// </summary>
-        [Required, Column("AddedSinceUTC")]
-        public DateTimeOffset AddedSince { get; set; }
+        public ulong? LastModifiedBy { get; set; }
+
         /// <summary>
-        /// Last time the game server checked
+        /// Last time someone edited the game server entry
         /// </summary>
-        [Required, Column("LastUpdateUTC")]
-        public DateTimeOffset LastUpdate { get; set; }
+        [Column("LastModifiedSinceUTC")]
+        public DateTimeOffset? LastModifiedSince { get; set; }
+
         /// <summary>
         /// How often to check the game server
         /// </summary>
-        [Required]
+        [Required, Column("UpdateIntervalHMS")]
         public TimeSpan UpdateInterval { get; set; } = TimeSpan.FromHours(1);
 
         /// <summary>
-        /// Extended configuration needs
+        /// Last time the game server checked
         /// </summary>
-        [NotMapped]
-        public string ErrMsg { get; set; }
+        [Column("LastUpdateUTC")]
+        public DateTimeOffset? LastUpdate { get; set; }
 
         /// <summary>
         /// Note about the game server
         /// </summary>
-        [Column("note")]
-        public string Note { get; set; } = "";
+        public string Note { get; set; }
+
+        /// <summary>
+        /// Extended configuration needs
+        /// </summary>
+        public string Remarks { get; set; }
     }
 }
