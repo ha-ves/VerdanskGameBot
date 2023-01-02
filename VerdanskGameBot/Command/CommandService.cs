@@ -93,7 +93,7 @@ namespace VerdanskGameBot.Command
                 {
                     switch (cmd.CommandName)
                     {
-                        case "server":
+                        case ServerCmd.Server:
                             GameServerCmdHandler(Program.BotClient, cmd);
                             break;
                         default:
@@ -172,22 +172,22 @@ namespace VerdanskGameBot.Command
 
             switch (subcmd.Name)
             {
-                case "list":
+                case ServerCmd.List:
                     GameServerListingHandler(cmd);
                     break;
-                case "add":
+                case ServerCmd.Add:
                     GameServerAdderHandler(cmd, subcmd.Options);
                     break;
-                case "movehere":
+                case ServerCmd.Movehere:
                     GameServerMoverHandler(bot, cmd, subcmd.Options);
                     break;
-                case "remove":
+                case ServerCmd.Remove:
                     GameServerRemovalHandler(bot, cmd, subcmd.Options);
                     break;
-                case "change":
+                case ServerCmd.Change:
                     GameServerChangeHandler(cmd, subcmd.Options);
                     break;
-                case "refresh":
+                case ServerCmd.Refresh:
                     GameServerRefreshHandler(cmd, subcmd.Options);
                     break;
                 default:
