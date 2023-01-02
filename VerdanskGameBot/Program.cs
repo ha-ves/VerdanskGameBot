@@ -133,16 +133,6 @@ namespace VerdanskGameBot
                     }
                 });
 
-            #region Pre-Start Debugging
-
-#if DEBUG
-
-            
-
-#endif
-
-            #endregion
-
             new Program().MainApp(args);
 
             Console.CancelKeyPress += Console_SIGINT;
@@ -215,6 +205,14 @@ namespace VerdanskGameBot
 
         private void MainApp(string[] args)
         {
+            #region Pre-Start Debugging
+
+#if DEBUG
+            
+#endif
+
+            #endregion
+
             Log.Info("");
             Log.Info("=====[ Starting Verdansk GameBot ]=====");
             Log.Info($"               {Version}");
@@ -425,7 +423,7 @@ namespace VerdanskGameBot
 
             Debugger.Break();
 #endif
-            await CommandService.StartService(BotClient, ExitCancel.Token);
+            await Command.CommandService.StartService(BotClient, ExitCancel.Token);
             GameServerWatcher.StartWatcher();
         }
 
