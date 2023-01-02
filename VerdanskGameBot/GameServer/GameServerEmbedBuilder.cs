@@ -3,6 +3,7 @@ using NodaTime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using VerdanskGameBot.GameServer.Db;
 
@@ -12,27 +13,40 @@ namespace VerdanskGameBot.GameServer
     {
         internal GameServerEmbedBuilder(GameServerModel server, IEmbed embed = null)
         {
-            WithTitle(string.IsNullOrEmpty(server.DisplayName) ? string.IsNullOrEmpty(embed.Title) ? "--Untitled Game Server--" : embed.Title : server.DisplayName);
-            WithDescription(string.IsNullOrEmpty(server.Description) ? string.IsNullOrEmpty(embed.Description) ? "--Game server has no description, could be any game server available out there.--" : embed.Description : $"⠀{Environment.NewLine}" + server.Description + $"{Environment.NewLine}⠀");
-            WithThumbnailUrl(string.IsNullOrEmpty(server.ImageUrl) ? !embed.Thumbnail.HasValue ? "https://cdn.discordapp.com/icons/790540532714831882/7449dcd6aded699bdbdec4718f66b6c8.webp" : embed.Thumbnail.ToString() : server.ImageUrl);
+            var title = ReplaceIfNullOrEmpty(server.DisplayName, embed.Title);
+            var desc = Environment.NewLine
+                       + ReplaceIfNullOrEmpty(server.Description, embed.Description)
+                       + Environment.NewLine;
+            var img = ReplaceIfNullOrEmpty(server.ImageUrl, embed.Image.Value.Url);
+
+            WithTitle(title);
+            WithDescription(desc);
+            WithImageUrl(img);
 
             var rand = new Random((int)(DateTimeOffset.Now - server.AddedSince).Ticks);
             WithColor(new Color(rand.Next(255), rand.Next(255), rand.Next(255)));
 
-            var lastonline = (server.LastOnline.HasValue ? server.LastOnline.Value : DateTimeOffset.MinValue);
-            AddField(server.IsOnline ? ":green_circle: Online" : ":red_circle: Offline", (server.IsOnline ? "Server is Online" : "Last online : " +
-                (server.LastOnline > server.AddedSince ? $"<t:{lastonline.ToUnixTimeSeconds()}:R>" : "Never")) + $"{Environment.NewLine}⠀", true);
+            var isonlinestr = server.IsOnline ? ":green_circle: Online" : ":red_circle: Offline";
+            var lastonlinetimestr = "Last Online : " + server.LastOnline is not null ? $"<t:{server.LastOnline.Value.ToUnixTimeSeconds()}:R>" : "Never";
+            AddField(isonlinestr, (!server.IsOnline ? lastonlinetimestr : "") + Environment.NewLine, true);
+
             AddField("IP Address", server.IP.ToString(), true);
             AddField("Game Port", server.GamePort.ToString(), true);
 
-            AddField("CLICK TO JOIN SERVER", (string.IsNullOrEmpty(server.GameLink) ? "--Server don't provide game link.--" : server.GameLink) + $"{Environment.NewLine}⠀", true);
+            var joinserver = ReplaceIfNullOrEmpty(server.GameLink, "--Server don't provide join link.--");
+            AddField("Join This Server", joinserver, true);
 
             AddField("Players", $"{server.Players}/{server.MaxPlayers}", true);
 
-            AddField("NOTE", (string.IsNullOrEmpty(server.Note) ? "--Empty--" : server.Note) + $"{Environment.NewLine}⠀");
+            AddField("NOTE", server.Note + Environment.NewLine);
 
             WithFooter($"Last checked ->");
             WithCurrentTimestamp();
+        }
+
+        private string ReplaceIfNullOrEmpty(string newstr, string existstr)
+        {
+            return string.IsNullOrEmpty(newstr) ? (string.IsNullOrEmpty(existstr) ? "" : existstr) : newstr;
         }
     }
 }
