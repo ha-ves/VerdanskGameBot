@@ -63,7 +63,8 @@ namespace VerdanskGameBot.GameServer
         public DateTimeOffset? LastOnline { get; set; }
 
         /// <summary>
-        /// Link to game
+        /// Link to game <br/>
+        /// Is using format [Text to show](steam://IP.addr.ess:port)
         /// </summary>
         [MaxLength(100)]
         public string GameLink { get; set; }
