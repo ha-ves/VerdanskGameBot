@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 
 namespace VerdanskGameBot.Ext
 {
+    internal class AppExitException : Exception { }
+
     /// <summary>
     /// Thrown when Object already exist
     /// </summary>
