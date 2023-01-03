@@ -18,7 +18,7 @@ namespace VerdanskGameBot.GameServer
         /// Primary Key
         /// </summary>
         [Key]
-        public ulong ServerId { get; set; }
+        public int ServerId { get; set; }
 
         /// <summary>
         /// Game Type

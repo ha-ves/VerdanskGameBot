@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VerdanskGameBot.GameServer.Db;
 
@@ -10,9 +11,10 @@ using VerdanskGameBot.GameServer.Db;
 namespace VerdanskGameBot.Migrations.MySql
 {
     [DbContext(typeof(GameServerMySqlDb))]
-    partial class GameServerMySqlDbModelSnapshot : ModelSnapshot
+    [Migration("20230103021258_MySql_PK_Fix")]
+    partial class MySql_PK_Fix
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
