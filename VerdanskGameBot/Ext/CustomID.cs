@@ -24,8 +24,7 @@ namespace VerdanskGameBot.Ext
         HostIPPort,
         GamePort,
         UpdateInterval,
-        Note,
-
+        Note
     }
 
     [MessagePackObject]
