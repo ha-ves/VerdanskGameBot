@@ -1,7 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
@@ -22,26 +24,38 @@ namespace VerdanskGameBot.GameServer.Db
             var config = new ConfigurationBuilder().AddCommandLine(args).Build();
             var optionsBuilder = new DbContextOptionsBuilder();
 
+            optionsBuilder
+                .LogTo((evid, lvl) => evid.Id >= RelationalEventId.MigrateUsingConnection.Id
+                                    && evid.Id <= RelationalEventId.ColumnOrderIgnoredWarning.Id,
+                evt => Program.Log.Trace(evt.ToString()));
+
             var connstr = config["ConnStr"];
-            switch (Enum.Parse<DbProviders>(config["DbType"]))
+            try
             {
-                case DbProviders.SQLite:
-                    optionsBuilder.UseSqlite(connstr);
-                    break;
-                case DbProviders.MySql:
-                    optionsBuilder.UseMySql(connstr, ServerVersion.AutoDetect(connstr));
-                    db = new GameServerMySqlDb(optionsBuilder.Options);
-                    break;
-                case DbProviders.SqlServer:
-                    optionsBuilder.UseSqlServer(connstr);
-                    db = new GameServerSqlServerDb(optionsBuilder.Options);
-                    break;
-                case DbProviders.PostgreSql:
-                    optionsBuilder.UseNpgsql(connstr);
-                    db = new GameServerPostgreSqlDb(optionsBuilder.Options);
-                    break;
-                default:
-                    throw new ArgumentException("Database Type (--DbType) not choosen");
+                switch (Enum.Parse<DbProviders>(config["DbType"]))
+                {
+                    case DbProviders.SQLite:
+                        optionsBuilder.UseSqlite(connstr);
+                        break;
+                    case DbProviders.MySql:
+                        optionsBuilder.UseMySql(connstr, ServerVersion.AutoDetect(connstr));
+                        db = new GameServerMySqlDb(optionsBuilder.Options);
+                        break;
+                    case DbProviders.SqlServer:
+                        optionsBuilder.UseSqlServer(connstr);
+                        db = new GameServerSqlServerDb(optionsBuilder.Options);
+                        break;
+                    case DbProviders.PostgreSql:
+                        optionsBuilder.UseNpgsql(connstr);
+                        db = new GameServerPostgreSqlDb(optionsBuilder.Options);
+                        break;
+                    default:
+                        throw new ArgumentException("Database Type (--DbType) not choosen");
+                }
+            }
+            catch (Exception e)
+            {
+                Program.Log.Warn(e);
             }
 
             return db;

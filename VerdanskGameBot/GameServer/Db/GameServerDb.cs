@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
+using NLog.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using NLog;
 using NLog.Fluent;
 using System;
 using System.Collections.Generic;
@@ -37,6 +39,11 @@ namespace VerdanskGameBot.GameServer.Db
 
             var connstr = Program.BotConfig["ConnectionString"];
             var dbprovider = Enum.Parse<DbProviders>(Program.BotConfig["DbProvider"]);
+
+            try
+            {
+                optionsBuilder.UseNLog();
+
             switch (dbprovider)
             {
                 case DbProviders.SQLite:
@@ -53,6 +60,11 @@ namespace VerdanskGameBot.GameServer.Db
                     break;
                 default:
                     break;
+            }
+            }
+            catch (Exception e)
+            {
+                Program.Log.Warn(e);
             }
 
             base.OnConfiguring(optionsBuilder);
