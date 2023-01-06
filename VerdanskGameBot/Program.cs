@@ -74,7 +74,8 @@ namespace VerdanskGameBot
             {
                 "--help",
                 "--version",
-                "--trace"
+                "--trace",
+                "--service"
             };
 
             if (args.Contains("--version"))
@@ -102,6 +103,7 @@ namespace VerdanskGameBot
                     + "    --help     : Prints this help screen" + Environment.NewLine
                     + "    --version  : Prints version" + Environment.NewLine
                     + "    --trace    : Enable most verbose/indepth logging" + Environment.NewLine
+                    + "    --service  : Run as a system service" + Environment.NewLine
                     + Environment.NewLine
                     + "Args also available via BotConfig.json file next to executable";
 
@@ -138,12 +140,13 @@ namespace VerdanskGameBot
             Console.CancelKeyPress += Console_SIGINT;
             AppDomain.CurrentDomain.ProcessExit += Process_SIGTERM;
 
-            if (BotConfig.GetSection("service") != null)
+            if (args.Contains("--service"))
             {
-                Log.Debug("App IS NOT Console Interactive (system service)");
+                Log.Debug("App IS NOT Console Interactive (ran as a system service)");
                 new ManualResetEvent(false).WaitOne();
             }
-            else {
+            else
+            {
                 Log.Debug("App IS Console Interactive");
                 while (true)
                 {
@@ -164,7 +167,7 @@ namespace VerdanskGameBot
 
         private static void Process_SIGTERM(object sender, EventArgs e)
         {
-            if(!IsExiting)
+            if (!IsExiting)
                 ExitRequested();
         }
 
@@ -268,7 +271,8 @@ namespace VerdanskGameBot
             Log.Trace("Configuring NodeJS ...");
             try
             {
-                StaticNodeJSService.InvokeFromStringAsync<string>(@"module.exports = (callback) => callback(null, 'NODEJSTEST');").Wait();
+                var nodejs = StaticNodeJSService.InvokeFromStringAsync<string>(@"module.exports = (callback) => callback(null, process.versions);").Result;
+                Log.Debug("Using NodeJS version " + JsonDocument.Parse(nodejs).RootElement.GetProperty("node"));
             }
             catch (Exception exc)
             {
@@ -277,14 +281,18 @@ namespace VerdanskGameBot
                 Environment.Exit(-(int)ExitCodes.NodeJSNotAvail);
                 return;
             }
-            Log.Trace("Configured NodeJS.");
+            Log.Debug("Configured NodeJS.");
 
             #endregion
 
             #region Configuring gamedig
 
             Log.Trace("Configuring gamedig ...");
-            try { StaticNodeJSService.InvokeFromStringAsync<string>(@"module.exports = (callback) => { require('gamedig'); callback(null, 'GAMEDIGTEST'); }").Wait(); }
+            try 
+            {
+                var gamedigver = StaticNodeJSService.InvokeFromStringAsync<string>(@"module.exports = (callback) => { callback(null, require('gamedig/package.json').version); }").Result;
+                Log.Debug("Using node-gamedig version " + gamedigver);
+            }
             catch
             {
                 Log.Info("{ gamedig } not available, trying to install...");
@@ -308,7 +316,7 @@ namespace VerdanskGameBot
                     return;
                 }
             }
-            Log.Trace("Configured gamedig.");
+            Log.Debug("Configured gamedig.");
 
             #endregion
 
@@ -325,9 +333,8 @@ namespace VerdanskGameBot
                 DefaultRetryMode = RetryMode.RetryTimeouts,
                 GatewayIntents = GatewayIntents.AllUnprivileged & ~(GatewayIntents.GuildInvites | GatewayIntents.GuildScheduledEvents)
             });
-            Log.Trace("BotToken Available.");
 
-            Log.Trace("Configured Discord Bot.");
+            Log.Debug("Configured Discord Bot.");
 
             #endregion
 
@@ -336,7 +343,7 @@ namespace VerdanskGameBot
             Log.Trace("Configuring Database ...");
             try
             {
-                Log.Debug($"Using {Enum.GetName(Enum.Parse<DbProviders>(BotConfig["DbProvider"]))} database");
+                Log.Trace($"Using {Enum.GetName(Enum.Parse<DbProviders>(BotConfig["DbProvider"]))} database");
 
                 using (var db = new GameServerContextFactory().CreateDbContext(new[] { "--ConnStr", BotConfig["ConnectionString"], "--DbType", BotConfig["DbProvider"] }))
                 {
@@ -357,7 +364,15 @@ namespace VerdanskGameBot
                 Environment.Exit(-(int)ExitCodes.DbConfigInvalid);
                 return;
             }
-            Log.Trace("Configured Database.");
+            Log.Debug("Configured Database.");
+
+            #endregion
+
+            #region Pre-Bot Debugging
+
+#if DEBUG
+
+#endif
 
             #endregion
 
@@ -374,7 +389,7 @@ namespace VerdanskGameBot
             BotClient.LoginAsync(TokenType.Bot, token).Wait();
 
             new EventWaitHandle(false, EventResetMode.ManualReset).WaitOne(5000);
-            if (BotClient.Rest.LoginState != LoginState.LoggedIn)
+            if (BotClient.ConnectionState != ConnectionState.Connected)
             {
                 if (string.IsNullOrEmpty(token))
                 {
@@ -393,38 +408,29 @@ namespace VerdanskGameBot
             #endregion
         }
 
-        private Task OnBotDisconnect(Exception arg)
-        {
-            return Task.CompletedTask;
-        }
-
         private async Task OnBotReady()
         {
             Log.Info("");
             Log.Info("=====[ Verdansk GameBot Started ]=====");
             Log.Info("");
-#if DEBUG
-            using (var it = new GameServerDb())
-            {
-                it.Add(new GameServerModel()
-                {
-                    GameType = "przomboid",
-                    ServerName = "testarea",
-                    LastOnline = DateTimeOffset.MinValue,
-                    AddedBy = 1,
-                    ChannelId = 1,
-                    MessageId = 1,
-                    IP = IPAddress.IPv6Loopback,
-                    GamePort = 12727,
-                    AddedSince = DateTimeOffset.Now,
-                });
-                await it.SaveChangesAsync();
-            }
 
-            Debugger.Break();
+            #region  OnBotReady Debugging
+
+#if DEBUG
+
 #endif
+
+            #endregion
+
             await Command.CommandService.StartService(BotClient, ExitCancel.Token);
             GameServerWatcher.StartWatcher();
+            }
+
+        #region Misc
+
+        private Task OnBotDisconnect(Exception arg)
+        {
+            return Task.CompletedTask;
         }
 
         private Task ClientLog(LogMessage msg)
@@ -455,5 +461,7 @@ namespace VerdanskGameBot
 
             return Task.CompletedTask;
         }
+
+        #endregion
     }
 }
