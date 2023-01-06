@@ -427,7 +427,7 @@ namespace VerdanskGameBot.Command
                     case GamePortFormatException formexc:
                         errormsg = $"Failed to add game server ***{servername}***, Game port number is not valid.";
                         break;
-                    case UpdateIntervalFormatException formexc:
+                    case UpdateIntervalInvalidException formexc:
                         errormsg = $"Failed to add game server ***{servername}***, Update interval is not valid.";
                         break;
                     case InvalidOperationException invopexc:
@@ -509,7 +509,7 @@ namespace VerdanskGameBot.Command
                     case GamePortFormatException formexc:
                         errormsg = $"Failed to add game server ***{servername}***, Game port number is not valid.";
                         break;
-                    case UpdateIntervalFormatException formexc:
+                    case UpdateIntervalInvalidException formexc:
                         errormsg = $"Failed to add game server ***{servername}***, Update interval is not valid.";
                         break;
                     case InvalidOperationException invopexc:

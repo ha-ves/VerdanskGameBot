@@ -94,7 +94,7 @@ namespace VerdanskGameBot.Migrations.MySql
                     b.HasIndex(new[] { "ServerName" }, "IX_ServerName")
                         .IsUnique();
 
-                    b.ToTable("GameServers");
+                    b.ToTable("gameservers_Default", (string)null);
                 });
 #pragma warning restore 612, 618
         }

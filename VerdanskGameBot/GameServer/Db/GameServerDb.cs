@@ -17,11 +17,15 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using VerdanskGameBot.Ext;
+using Discord;
+using Discord.WebSocket;
 
 namespace VerdanskGameBot.GameServer.Db
 {
     public class GameServerDb : DbContext
     {
+        internal IGuild Guild;
+
         internal DbSet<GameServerModel> GameServers { get; set; }
 
         public GameServerDb(DbContextOptions options) : base(options)
@@ -32,35 +36,37 @@ namespace VerdanskGameBot.GameServer.Db
         {
         }
 
+        public GameServerDb(IGuild guild) : base() => Guild = guild;
+
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             if (optionsBuilder.IsConfigured)
                 return;
 
             var connstr = Program.BotConfig["ConnectionString"];
-            var dbprovider = Enum.Parse<DbProviders>(Program.BotConfig["DbProvider"]);
+            var dbprovider = Enum.Parse<DbTypes>(Program.BotConfig["DbProvider"]);
 
             try
             {
                 optionsBuilder.UseNLog();
 
-            switch (dbprovider)
-            {
-                case DbProviders.SQLite:
-                    optionsBuilder.UseSqlite(connstr);
-                    break;
-                case DbProviders.MySql:
-                    optionsBuilder.UseMySql(connstr, ServerVersion.AutoDetect(connstr));
-                    break;
-                case DbProviders.SqlServer:
-                    optionsBuilder.UseSqlServer(connstr);
-                    break;
-                case DbProviders.PostgreSql:
-                    optionsBuilder.UseNpgsql(connstr);
-                    break;
-                default:
-                    break;
-            }
+                switch (dbprovider)
+                {
+                    case DbTypes.SQLite:
+                        optionsBuilder.UseSqlite(connstr);
+                        break;
+                    case DbTypes.MySql:
+                        optionsBuilder.UseMySql(connstr, ServerVersion.AutoDetect(connstr));
+                        break;
+                    case DbTypes.SqlServer:
+                        optionsBuilder.UseSqlServer(connstr);
+                        break;
+                    case DbTypes.PostgreSql:
+                        optionsBuilder.UseNpgsql(connstr);
+                        break;
+                    default:
+                        break;
+                }
             }
             catch (Exception e)
             {
@@ -100,6 +106,9 @@ namespace VerdanskGameBot.GameServer.Db
                 .IsRequired(false);
             gs.Property(x => x.Remarks)
                 .IsRequired(false);
+
+            var guild = (Guild != null ? Guild.Id.ToString() : "Default").Normalize();
+            gs.ToTable("gameservers_" + guild);
 
             base.OnModelCreating(modelBuilder);
         }

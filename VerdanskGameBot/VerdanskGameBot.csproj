@@ -35,6 +35,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="Commands\AddServerModalBuilder.cs" />
+    <Compile Remove="Commands\ChangeServerModalBuilder.cs" />
+    <Compile Remove="Commands\CommandService.cs" />
+    <Compile Remove="Commands\CommandServiceVars.cs" />
+    <Compile Remove="GameServer\GameServerEmbedBuilder.cs" />
+    <Compile Remove="GameServer\GameServerWatcher_OLd.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Remove="BotConfig.json" />
     <None Remove="gameservers.db" />
     <None Remove="NLog.config" />
@@ -89,7 +98,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Migrations\" />
+    <Folder Include="GameServer\Db\Migrations\" />
   </ItemGroup>
 
 </Project>

@@ -10,7 +10,6 @@ using System.Security;
 
 namespace VerdanskGameBot.GameServer
 {
-    [Table("GameServers")]
     [Index(nameof(ServerName), IsUnique = true, Name = "IX_ServerName")]
     public class GameServerModel
     {

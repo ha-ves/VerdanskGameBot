@@ -32,20 +32,20 @@ namespace VerdanskGameBot.GameServer.Db
             var connstr = config["ConnStr"];
             try
             {
-                switch (Enum.Parse<DbProviders>(config["DbType"]))
+                switch (Enum.Parse<DbTypes>(config["DbType"]))
                 {
-                    case DbProviders.SQLite:
+                    case DbTypes.SQLite:
                         optionsBuilder.UseSqlite(connstr);
                         break;
-                    case DbProviders.MySql:
+                    case DbTypes.MySql:
                         optionsBuilder.UseMySql(connstr, ServerVersion.AutoDetect(connstr));
                         db = new GameServerMySqlDb(optionsBuilder.Options);
                         break;
-                    case DbProviders.SqlServer:
+                    case DbTypes.SqlServer:
                         optionsBuilder.UseSqlServer(connstr);
                         db = new GameServerSqlServerDb(optionsBuilder.Options);
                         break;
-                    case DbProviders.PostgreSql:
+                    case DbTypes.PostgreSql:
                         optionsBuilder.UseNpgsql(connstr);
                         db = new GameServerPostgreSqlDb(optionsBuilder.Options);
                         break;

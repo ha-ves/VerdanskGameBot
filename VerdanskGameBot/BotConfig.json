@@ -1,7 +1,8 @@
 {
   "BotToken": "",
-  "Verbose": false,
+  "GuildId": 0,
   "LocalIP": "127.0.0.1",
   "DbProvider": 0,
-  "ConnectionString": "Data Source=gameservers.db;"
+  "ConnectionString": "Data Source=gameservers.db;",
+  "Verbose": false
 }

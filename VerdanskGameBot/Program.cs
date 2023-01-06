@@ -1,4 +1,5 @@
 ﻿using Discord;
+using Discord.Interactions;
 using Discord.Net;
 using Discord.WebSocket;
 using Jering.Javascript.NodeJS;
@@ -11,6 +12,7 @@ using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
 using NLog;
 using NLog.Config;
+using NLog.Extensions.Logging;
 using NLog.Fluent;
 using NLog.Targets;
 using Npgsql;
@@ -22,13 +24,15 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http.Json;
 using System.Reflection;
 using System.Security;
 using System.Text.Json;
+using System.Text.Unicode;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
-using VerdanskGameBot.Command;
+using VerdanskGameBot.Commands;
 using VerdanskGameBot.Ext;
 using VerdanskGameBot.GameServer;
 using VerdanskGameBot.GameServer.Db;
@@ -37,7 +41,7 @@ namespace VerdanskGameBot
 {
     class Program
     {
-        #region Internal
+        #region Internal Properties
 
         internal static Logger Log { get; } = LogManager.GetCurrentClassLogger();
         internal static CancellationTokenSource ExitCancel { get; } = new CancellationTokenSource();
@@ -46,10 +50,11 @@ namespace VerdanskGameBot
 
         #endregion
 
-        #region Bot Info
+        #region Bot Info Properties
 
         internal static IConfigurationRoot BotConfig { get; private set; } = null;
         internal static DiscordSocketClient BotClient { get; private set; }
+        internal static InteractionService BotInteraction { get; private set; }
         internal static IPAddress LAN_IP { get; private set; }
         internal static bool IsConnected { get => BotClient.ConnectionState == ConnectionState.Connected; }
 
@@ -187,7 +192,7 @@ namespace VerdanskGameBot
             ExitCancel.Cancel();
             ExitCancel.Dispose();
 
-            GameServerWatcher.Dispose();
+            BotInteraction.Dispose();
 
             if (BotClient != null)
             {
@@ -211,7 +216,7 @@ namespace VerdanskGameBot
             #region Pre-Start Debugging
 
 #if DEBUG
-            
+
 #endif
 
             #endregion
@@ -245,7 +250,7 @@ namespace VerdanskGameBot
                 BotConfig = new ConfigurationBuilder()
                     .AddJsonFile("BotConfig.json")
                     .Build();
-                
+
                 token = BotConfig["BotToken"];
                 Log.Trace("BotToken Available.");
                 isverbose = bool.Parse(BotConfig["Verbose"]);
@@ -323,6 +328,7 @@ namespace VerdanskGameBot
             #region Configuring Discord Bot
 
             Log.Trace("Configuring Discord Bot ...");
+
             BotClient = new DiscordSocketClient(new DiscordSocketConfig()
             {
 #if DEBUG
@@ -331,8 +337,28 @@ namespace VerdanskGameBot
                 LogLevel = isverbose ? LogSeverity.Verbose : LogSeverity.Info,
 #endif
                 DefaultRetryMode = RetryMode.RetryTimeouts,
-                GatewayIntents = GatewayIntents.AllUnprivileged & ~(GatewayIntents.GuildInvites | GatewayIntents.GuildScheduledEvents)
+                GatewayIntents = GatewayIntents.AllUnprivileged & ~(GatewayIntents.GuildInvites | GatewayIntents.GuildScheduledEvents),
+                MaxWaitBetweenGuildAvailablesBeforeReady = (int)TimeSpan.FromSeconds(60).TotalMilliseconds
             });
+
+            BotInteraction = new InteractionService(BotClient, new InteractionServiceConfig() { InteractionCustomIdDelimiters = new[] { ',' } });
+
+            BotClient.InteractionCreated += async (x) =>
+            {
+                var ctx = new SocketInteractionContext(BotClient, x);
+                await BotInteraction.ExecuteCommandAsync(ctx, null);
+            };
+
+            Log.Debug("Loading interaction modules ...");
+
+            var modules = Assembly.GetEntryAssembly().GetTypes().Where(t => t.IsSubclassOf(typeof(InteractionModuleBase<SocketInteractionContext>)));
+            foreach (var module in modules)
+            {
+                BotInteraction.AddModuleAsync(module, null).Wait();
+                Log.Trace($"Added interaction : {module.Name}");
+            }
+
+            Log.Debug("Loaded interaction modules.");
 
             Log.Debug("Configured Discord Bot.");
 
@@ -341,22 +367,13 @@ namespace VerdanskGameBot
             #region Configuring Database
 
             Log.Trace("Configuring Database ...");
+
             try
             {
-                Log.Trace($"Using {Enum.GetName(Enum.Parse<DbProviders>(BotConfig["DbProvider"]))} database");
-
-                using (var db = new GameServerContextFactory().CreateDbContext(new[] { "--ConnStr", BotConfig["ConnectionString"], "--DbType", BotConfig["DbProvider"] }))
-                {
-                    Log.Trace("[DB] Current Migration : " +
-                        $"{db.Database.GetAppliedMigrations().LastOrDefault()}");
-                    var migrations = db.Database.GetPendingMigrations();
-                    if (migrations.Any())
-                    {
-                        var str = migrations.Aggregate((a, b) => $"{a} -> {b}");
-                        Log.Trace($"[DB] Migration Pending : {str}");
-                        db.Database.Migrate();
-                    }
-                }
+                Log.Trace($"Using {Enum.GetName(Enum.Parse<DbTypes>(BotConfig["DbProvider"]))} database");
+#pragma warning disable CS0642 // Possible mistaken empty statement
+                using (new GameServerDb()) ;
+#pragma warning restore CS0642 // Possible mistaken empty statement
             }
             catch (ArgumentNullException e)
             {
@@ -364,6 +381,7 @@ namespace VerdanskGameBot
                 Environment.Exit(-(int)ExitCodes.DbConfigInvalid);
                 return;
             }
+
             Log.Debug("Configured Database.");
 
             #endregion
@@ -380,15 +398,21 @@ namespace VerdanskGameBot
 
             Log.Trace("Starting Discord Bot ...");
 
+            var botready = new EventWaitHandle(false, EventResetMode.ManualReset);
+
             BotClient.Log += ClientLog;
             BotClient.LoggedIn += BotClient.StartAsync;
-            BotClient.Ready += OnBotReady;
+            BotClient.Ready += async () =>
+            {
+                await OnBotReady();
+                botready.Set();
+            };
             BotClient.Disconnected += OnBotDisconnect;
 
             BotClient.SetActivityAsync(new Game("Refugees", ActivityType.Watching)).Wait();
             BotClient.LoginAsync(TokenType.Bot, token).Wait();
 
-            new EventWaitHandle(false, EventResetMode.ManualReset).WaitOne(5000);
+            botready.WaitOne((int)TimeSpan.FromSeconds(60).TotalMilliseconds);
             if (BotClient.ConnectionState != ConnectionState.Connected)
             {
                 if (string.IsNullOrEmpty(token))
@@ -406,25 +430,26 @@ namespace VerdanskGameBot
             }
 
             #endregion
+
+            Log.Info("");
+            Log.Info("=====[ Verdansk GameBot Started ]=====");
+            Log.Info("");
         }
 
         private async Task OnBotReady()
         {
-            Log.Info("");
-            Log.Info("=====[ Verdansk GameBot Started ]=====");
-            Log.Info("");
-
             #region  OnBotReady Debugging
 
 #if DEBUG
-
+            var gs = new GameServerModel { ServerName = "ASD" };
+            var asd = await GameServerWatcher.QueryGameServerAsync(gs);
+            Debugger.Break();
 #endif
 
             #endregion
 
-            await Command.CommandService.StartService(BotClient, ExitCancel.Token);
-            GameServerWatcher.StartWatcher();
-            }
+            return;// Task.CompletedTask;
+        }
 
         #region Misc
 

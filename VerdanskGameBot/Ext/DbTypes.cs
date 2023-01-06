@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace VerdanskGameBot.Ext
 {
-    public enum DbProviders
+    public enum DbTypes
     {
         SQLite,
         MySql,
