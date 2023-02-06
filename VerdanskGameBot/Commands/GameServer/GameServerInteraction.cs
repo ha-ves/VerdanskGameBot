@@ -88,16 +88,16 @@ namespace VerdanskGameBot.Commands.GameServer
                 switch (reggs.Exception.GetBaseException())
                 {
                     case GameServerGameTypeInvalidException:
-                        invalid = "Game Type Not Supported. Try using other fame type with the same protocol.";
+                        invalid = "Game Type Not Supported. Try using other game type with the same protocol.";
                         break;
                     case GameServerHostnameIPPortInvalidException:
-                        invalid = "Hostname / IP" + invalid;
+                        invalid = "Hostname / IP : Game Port" + invalid;
                         break;
                     case GameServerUpdateIntervalInvalidException:
                         invalid = "Update Interval" + invalid;
                         break;
                     default:
-                        invalid = "Please try again.";
+                        invalid = "Sumthing wong, i can feel it. Please try again.";
                         break;
                 }
 
@@ -106,11 +106,7 @@ namespace VerdanskGameBot.Commands.GameServer
                 return;
             }
 
-            Program.Log.Debug($"User @{Context.User.Id} added game server {{ {servername} }} to watch list for guild ${Context.Guild.Id}.");
-            await FollowupAsync($"{Context.User.Mention} Added a game server to watch list on this channel ({MentionUtils.MentionChannel(Context.Channel.Id)}).");
-
-            var placeholder = await Context.Channel.SendMessageAsync("***Querying a game server to watch ...***");
-            var querygs = GameServerWatcher.QueryGameServerAsync(reggs.Result);
+            await RespondWithWatcherMessageAsync(reggs.Result);
 
             //(Context.Channel as SocketTextChannel).CreateThreadAsync()
 

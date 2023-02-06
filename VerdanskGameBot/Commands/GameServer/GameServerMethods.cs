@@ -10,6 +10,10 @@ using VerdanskGameBot.Ext;
 using VerdanskGameBot.GameServer.Db;
 using VerdanskGameBot.GameServer;
 using Discord.Interactions;
+using HtmlAgilityPack;
+using Jering.Javascript.NodeJS;
+using System.Net.Http;
+using System.Text.Json;
 
 namespace VerdanskGameBot.Commands.GameServer
 {
@@ -24,12 +28,12 @@ namespace VerdanskGameBot.Commands.GameServer
         /// <returns></returns>
         private Task<IUserMessage> RespondWithAddServerTryAgainAsync(AddServerModal modal, string servername, string invalid)
         {
-            await FollowupAsync(ephemeral: true,
+            return FollowupAsync(ephemeral: true,
                 embed: new EmbedBuilder()
                     .WithTitle($"Failed to add '{servername}'")
                     .WithDescription(invalid)
                     .AddField("Game Type", modal.GameType, true)
-                    .AddField("Hostname / IP", modal.HostnameIPPort, true)
+                    .AddField("Hostname / IP : Game Port", modal.HostnameIPPort, true)
                     .AddField("Update Interval", modal.UpdateInterval, true)
                     .AddField("Note", string.IsNullOrEmpty(modal.Note) ? '-' : modal.Note, false)
                 .Build(),
@@ -42,6 +46,10 @@ namespace VerdanskGameBot.Commands.GameServer
                     label: "Supported Games List", style: ButtonStyle.Link,
                     emote: Emoji.Parse(":globe_with_meridians:"),
                     url: "https://github.com/gamedig/node-gamedig/tree/70ec2a45a7#supported")
+                .WithButton(
+                    label: "Check DNS Propagation", style: ButtonStyle.Link,
+                    emote: Emoji.Parse(":globe_with_meridians:"),
+                    url: "https://letmegooglethat.com/?q=dns+propagation+check")
                 .Build());
         }
 
@@ -66,7 +74,7 @@ namespace VerdanskGameBot.Commands.GameServer
                 serverip = (Dns.GetHostAddressesAsync(modal.HostnameIPPort.Split(':').First())).Result.First();
                 gameport = ushort.Parse(modal.HostnameIPPort.Split(':').Last());
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return Task.FromException<GameServerModel>(new GameServerHostnameIPPortInvalidException(modal.HostnameIPPort));
             }
@@ -77,7 +85,7 @@ namespace VerdanskGameBot.Commands.GameServer
             {
                 updateInt = TimeSpan.FromMinutes(byte.Parse(modal.UpdateInterval));
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return Task.FromException<GameServerModel>(new GameServerUpdateIntervalInvalidException(modal.UpdateInterval));
             }
@@ -105,6 +113,20 @@ namespace VerdanskGameBot.Commands.GameServer
             }
 
             return Task.FromResult(gs);
+        }
+
+        private async Task RespondWithWatcherMessageAsync(GameServerModel reggs)
+        {
+            Program.Log.Debug($"User @{Context.User.Id} added game server {{ {reggs.ServerName} }} to watch list for guild ${Context.Guild.Id}.");
+            await FollowupAsync($"{Context.User.Mention} Added a game server to watch list on this channel ({MentionUtils.MentionChannel(Context.Channel.Id)}).");
+
+            var placeholder = await Context.Channel.SendMessageAsync(embed: new GameServerEmbedBuilder(reggs).Build());
+            var thread = await (Context.Channel as SocketTextChannel)
+                .CreateThreadAsync(reggs.DisplayName ?? "Discuss this game server", message: placeholder, invitable: true);
+
+            reggs.ChannelId = Context.Channel.Id;
+            reggs.MessageId = placeholder.Id;
+            reggs.ThreadId = thread.Id;
         }
     }
 }

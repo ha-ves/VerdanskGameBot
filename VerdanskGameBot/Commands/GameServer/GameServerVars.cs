@@ -149,7 +149,7 @@ namespace VerdanskGameBot.Commands.GameServer
             public string HostnameIPPort { get; set; }
 
             [RequiredInput]
-            [InputLabel("Update Interval")]
+            [InputLabel("Update Interval (minutes)")]
             [ModalTextInput("updateint",
                 TextInputStyle.Short,
                 "Watch Update Interval (in Minutes, min. 1, max. 99)",
