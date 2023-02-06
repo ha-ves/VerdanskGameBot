@@ -15,7 +15,14 @@ namespace VerdanskGameBot.Commands.GameServer
 {
     internal partial class GameServerInteraction : InteractionModuleBase<SocketInteractionContext>
     {
-        private async Task RespondWithAddServerTryAgainAsync(AddServerModal modal, string servername, string invalid)
+        /// <summary>
+        /// Respond the interaction with try add server again message.
+        /// </summary>
+        /// <param name="modal">The original details form <see cref="AddServerModal"/>.</param>
+        /// <param name="servername">The servername to try again.</param>
+        /// <param name="invalid">Try again description.</param>
+        /// <returns></returns>
+        private Task<IUserMessage> RespondWithAddServerTryAgainAsync(AddServerModal modal, string servername, string invalid)
         {
             await FollowupAsync(ephemeral: true,
                 embed: new EmbedBuilder()
@@ -38,7 +45,14 @@ namespace VerdanskGameBot.Commands.GameServer
                 .Build());
         }
 
-        private Task<GameServerModel> RegisterNewGameServer(string servername, AddServerModal modal, SocketGuild guild)
+        /// <summary>
+        /// Register a new <see cref="GameServerModel"/> to database for the respective <paramref name="guild"/> / discord server.
+        /// </summary>
+        /// <param name="servername">Private servername by admin.</param>
+        /// <param name="modal">The details form <see cref="AddServerModal"/>.</param>
+        /// <param name="guild">The guild to register to.</param>
+        /// <returns></returns>
+        private Task<GameServerModel> RegisterGameServerAsync(string servername, AddServerModal modal, IGuild guild)
         {
             var gametype = modal.GameType.Normalize().ToLowerInvariant();
             if (!GameTypeHelper.IsSupported(gametype))

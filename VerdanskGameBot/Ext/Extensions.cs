@@ -14,6 +14,11 @@ namespace VerdanskGameBot.Ext
 {
     static partial class Extensions
     {
+        /// <summary>
+        /// Use NLog logger for EF Core logging
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <returns></returns>
         public static DbContextOptionsBuilder UseNLog(this DbContextOptionsBuilder builder)
         {
             builder
