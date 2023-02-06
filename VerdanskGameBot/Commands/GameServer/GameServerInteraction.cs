@@ -44,7 +44,7 @@ namespace VerdanskGameBot.Commands.GameServer
                     return false;
                 }
 
-                using (var db = new GameServerDb())
+                using (var db = new GameBotDb(Context.Guild))
                 {
                     if (db.GameServers.Any(gs => gs.ServerName == servername))
                     {

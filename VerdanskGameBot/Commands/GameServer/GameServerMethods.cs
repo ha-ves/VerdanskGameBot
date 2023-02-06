@@ -105,9 +105,13 @@ namespace VerdanskGameBot.Commands.GameServer
 
             try
             {
-                using (var db = new GameServerDb()) db.Add(gs);
+                using (var db = new GameBotDb(Context.Guild))
+                {
+                    db.Add(gs);
+                    //db.SaveChanges();
+                }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return Task.FromException<GameServerModel>(new GameServerDbAddException());
             }

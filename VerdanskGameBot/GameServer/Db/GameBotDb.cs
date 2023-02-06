@@ -19,36 +19,51 @@ using System.Threading.Tasks;
 using VerdanskGameBot.Ext;
 using Discord;
 using Discord.WebSocket;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.Data.SqlClient;
+using Microsoft.Data.Sqlite;
 
 namespace VerdanskGameBot.GameServer.Db
 {
-    public class GameServerDb : DbContext
+    public class GameServerDbReadOnly : GameBotDb
     {
+        public GameServerDbReadOnly() : base ((IGuild)null)
+        {
+            ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTrackingWithIdentityResolution;
+        }
+
+        public GameServerDbReadOnly(IGuild guild) : base(guild) { }
+    }
+
+    public class GameBotDb : DbContext
+    {
+        internal static SqliteConnection _sqliteconn;
+
         internal IGuild Guild;
 
         internal DbSet<GameServerModel> GameServers { get; set; }
 
-        public GameServerDb(DbContextOptions options) : base(options)
-        {
-        }
+        public GameBotDb(IGuild guild) : base() => Guild = guild;
 
-        public GameServerDb() : base()
-        {
-        }
-
-        public GameServerDb(IGuild guild) : base() => Guild = guild;
+        public GameBotDb(DbContextOptions options) : base(options) { }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             if (optionsBuilder.IsConfigured)
+            {
+                base.OnConfiguring(optionsBuilder);
                 return;
+            }
 
             var connstr = Program.BotConfig["ConnectionString"];
             var dbprovider = Enum.Parse<DbTypes>(Program.BotConfig["DbProvider"]);
 
             try
             {
-                optionsBuilder.UseNLog();
+                //optionsBuilder.UseNLog();
+                optionsBuilder.EnableSensitiveDataLogging();
+                optionsBuilder.LogTo((evtid, lvl) => lvl == Microsoft.Extensions.Logging.LogLevel.Information,
+                    log => Program.Log.Trace($"<{log.LogLevel}> {log.EventId.Id} / {log.EventId.Name} | " + log.ToString()));
 
                 switch (dbprovider)
                 {
@@ -89,26 +104,27 @@ namespace VerdanskGameBot.GameServer.Db
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            var gs = modelBuilder.Entity<GameServerModel>();
-
-            gs.Property(x => x.LastOnline)
+            modelBuilder.Entity<GameServerModel>(gs =>
+            {
+                gs.Property(p => p.LastOnline)
                 .HasDefaultValue(DateTimeOffset.MinValue);
 
-            gs.Property(x => x.GameLink)
-                .IsRequired(false);
-            gs.Property(x => x.LastModifiedBy)
-                .IsRequired(false);
-            gs.Property(x => x.LastModifiedSince)
-                .IsRequired(false);
-            gs.Property(x => x.LastUpdate)
-                .IsRequired(false);
-            gs.Property(x => x.Note)
-                .IsRequired(false);
-            gs.Property(x => x.Remarks)
-                .IsRequired(false);
-
-            var guild = (Guild != null ? Guild.Id.ToString() : "Default").Normalize();
-            gs.ToTable("gameservers_" + guild);
+                gs.Property(p => p.GameLink)
+                    .IsRequired(false);
+                gs.Property(p => p.LastModifiedBy)
+                    .IsRequired(false);
+                gs.Property(p => p.LastModifiedSince)
+                    .IsRequired(false);
+                gs.Property(p => p.LastUpdate)
+                    .IsRequired(false);
+                gs.Property(p => p.Note)
+                    .IsRequired(false);
+                gs.Property(p => p.Remarks)
+                    .IsRequired(false);
+                
+                var guild = (Guild != null ? Guild.Id.ToString("x2") : "Default").Normalize();
+                gs.ToTable("gameservers_" + guild);
+            });
 
             base.OnModelCreating(modelBuilder);
         }

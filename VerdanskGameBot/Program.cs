@@ -371,8 +371,15 @@ namespace VerdanskGameBot
             try
             {
                 Log.Trace($"Using {Enum.GetName(Enum.Parse<DbTypes>(BotConfig["DbProvider"]))} database");
+
+                if (Enum.Parse<DbTypes>(BotConfig["DbProvider"]) == DbTypes.SQLite && BotConfig["ConnectionString"].Contains("Mode=Memory"))
+                {
+                    GameBotDb._sqliteconn = new SqliteConnection(BotConfig["ConnectionString"]);
+                    GameBotDb._sqliteconn.Open();
+                }
+
 #pragma warning disable CS0642 // Possible mistaken empty statement
-                using (new GameServerDb()) ;
+                using (var db = new GameBotDb((IGuild)null)) ;
 #pragma warning restore CS0642 // Possible mistaken empty statement
             }
             catch (ArgumentNullException e)
