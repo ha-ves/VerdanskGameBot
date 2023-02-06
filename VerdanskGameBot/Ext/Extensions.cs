@@ -52,5 +52,37 @@ namespace VerdanskGameBot.Ext
 
             return builder;
         }
+
+        /// <summary>
+        /// Replace the properties value of this <see cref="GameServerModel"/> with a new updated one.
+        /// </summary>
+        /// <param name="srcModel">The old <see cref="GameServerModel"/> to replace</param>
+        /// <param name="dstModel">The new <see cref="GameServerModel"/> to replace with</param>
+        /// <returns></returns>
+        public static GameServerModel ReplaceQueried(this GameServerModel srcModel, GameServerModel dstModel)
+        {
+            srcModel.GameType = dstModel.GameType;
+            srcModel.DisplayName = dstModel.DisplayName;
+            srcModel.Description = dstModel.Description;
+            srcModel.ImageUrl = dstModel.ImageUrl;
+            srcModel.IsOnline = dstModel.IsOnline;
+            srcModel.LastOnline = dstModel.LastOnline;
+            srcModel.GameLink = dstModel.GameLink;
+            srcModel.Players = dstModel.Players;
+            srcModel.MaxPlayers = dstModel.MaxPlayers;
+            srcModel.ChannelId = dstModel.ChannelId;
+            srcModel.MessageId = dstModel.MessageId;
+            srcModel.ThreadId = dstModel.ThreadId;
+            srcModel.IP = dstModel.IP;
+            srcModel.GamePort = dstModel.GamePort;
+            srcModel.LastModifiedBy = dstModel.LastModifiedBy;
+            srcModel.LastModifiedSince = dstModel.LastModifiedSince;
+            srcModel.UpdateInterval = dstModel.UpdateInterval;
+            srcModel.LastUpdate = dstModel.LastUpdate;
+            srcModel.Note = dstModel.Note;
+            srcModel.Remarks = dstModel.Remarks;
+
+            return srcModel;
+        }
     }
 }
