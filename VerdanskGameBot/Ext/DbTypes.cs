@@ -11,7 +11,6 @@ namespace VerdanskGameBot.Ext
         SQLite,
         MySql,
         SqlServer,
-        PostgreSql,
-        InMemory
+        PostgreSql
     }
 }
