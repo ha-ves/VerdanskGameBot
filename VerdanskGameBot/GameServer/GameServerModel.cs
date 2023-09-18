@@ -105,6 +105,12 @@ namespace VerdanskGameBot.GameServer
         public ulong MessageId { get; set; }
 
         /// <summary>
+        /// Discussion thread for the game server watch list
+        /// </summary>
+        [Required]
+        public ulong ThreadId { get; set; }
+
+        /// <summary>
         /// IP Address of the game server
         /// </summary>
         [Required]
@@ -131,7 +137,7 @@ namespace VerdanskGameBot.GameServer
         /// How often to check the game server
         /// </summary>
         [Required, Column("UpdateIntervalHMS")]
-        public TimeSpan UpdateInterval { get; set; } = TimeSpan.FromHours(1);
+        public TimeSpan UpdateInterval { get; set; }
 
         /// <summary>
         /// Last time the game server checked

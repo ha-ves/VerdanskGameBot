@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,7 +13,7 @@ namespace VerdanskGameBot.GameServer.Db
         public DateTimeOffsetToDateTimeConverter()
             : base(
                 toDb => toDb.UtcDateTime,
-                fromDb => new DateTimeOffset(fromDb)
+                fromDb => new DateTimeOffset(fromDb, TimeSpan.Zero)
                 )
         {
         }

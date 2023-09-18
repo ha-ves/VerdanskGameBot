@@ -79,7 +79,7 @@ namespace VerdanskGameBot.Commands.GameServer
 
             var servername = (Context.Interaction as SocketModal).Data.CustomId.Split('^').Last();
 
-            var reggs = RegisterNewGameServer(servername, modal, Context.Guild);
+            var reggs = RegisterGameServerAsync(servername, modal, Context.Guild);
 
             if (!reggs.IsCompletedSuccessfully)
             {
@@ -108,8 +108,10 @@ namespace VerdanskGameBot.Commands.GameServer
 
             await RespondWithWatcherMessageAsync(reggs.Result);
 
-            //(Context.Channel as SocketTextChannel).CreateThreadAsync()
+            await GameServerWatcher.UpdateWatcherAsync(reggs.Result);
 
+            // TODO: announce added game server to news/broadcast/announcement channel
+            //Context.Guild.TextChannels.First(tc => tc.GetChannelType() == ChannelType.News).SendMessageAsync;
         }
 
         #region Re Adding Server 'try again button'

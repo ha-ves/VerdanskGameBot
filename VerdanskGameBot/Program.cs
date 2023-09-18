@@ -3,11 +3,17 @@ using Discord.Interactions;
 using Discord.Net;
 using Discord.WebSocket;
 using Jering.Javascript.NodeJS;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.CommandLine;
 using Microsoft.Extensions.Configuration.Json;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
 using NLog;
@@ -19,6 +25,7 @@ using Npgsql;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -28,11 +35,13 @@ using System.Net.Http.Json;
 using System.Reflection;
 using System.Security;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Text.Unicode;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 using VerdanskGameBot.Commands;
+using VerdanskGameBot.Commands.GameServer;
 using VerdanskGameBot.Ext;
 using VerdanskGameBot.GameServer;
 using VerdanskGameBot.GameServer.Db;
@@ -55,7 +64,6 @@ namespace VerdanskGameBot
         internal static IConfigurationRoot BotConfig { get; private set; } = null;
         internal static DiscordSocketClient BotClient { get; private set; }
         internal static InteractionService BotInteraction { get; private set; }
-        internal static IPAddress LAN_IP { get; private set; }
         internal static bool IsConnected { get => BotClient.ConnectionState == ConnectionState.Connected; }
 
         #endregion
@@ -141,6 +149,12 @@ namespace VerdanskGameBot
                 });
 
             new Program().MainApp(args);
+
+            //var builder = Host.CreateApplicationBuilder(args);
+            //builder.Logging.AddNLog(LogManager.Configuration);
+            
+            //var app = builder.Build();
+            //app.Start();
 
             Console.CancelKeyPress += Console_SIGINT;
             AppDomain.CurrentDomain.ProcessExit += Process_SIGTERM;
@@ -255,8 +269,6 @@ namespace VerdanskGameBot
                 Log.Trace("BotToken Available.");
                 isverbose = bool.Parse(BotConfig["Verbose"]);
                 Log.Trace("Verbose Available.");
-                LAN_IP = IPAddress.Parse(BotConfig["LocalIP"]);
-                Log.Trace("LocalIP Available.");
 
                 if (isverbose)
                     LogManager.Configuration.FindRuleByName("consolelog").EnableLoggingForLevel(LogLevel.Debug);
@@ -293,7 +305,7 @@ namespace VerdanskGameBot
             #region Configuring gamedig
 
             Log.Trace("Configuring gamedig ...");
-            try 
+            try
             {
                 var gamedigver = StaticNodeJSService.InvokeFromStringAsync<string>(@"module.exports = (callback) => { callback(null, require('gamedig/package.json').version); }").Result;
                 Log.Debug("Using node-gamedig version " + gamedigver);
@@ -409,10 +421,15 @@ namespace VerdanskGameBot
 
             BotClient.Log += ClientLog;
             BotClient.LoggedIn += BotClient.StartAsync;
-            BotClient.Ready += async () =>
+            BotClient.Ready += () =>
             {
-                await OnBotReady();
-                botready.Set();
+                Task.Run(async () =>
+                {
+                    botready.Set();
+                    await OnBotReady();
+                });
+
+                return Task.CompletedTask;
             };
             BotClient.Disconnected += OnBotDisconnect;
 
@@ -437,24 +454,24 @@ namespace VerdanskGameBot
             }
 
             #endregion
-
-            Log.Info("");
-            Log.Info("=====[ Verdansk GameBot Started ]=====");
-            Log.Info("");
         }
 
         private async Task OnBotReady()
         {
+            Log.Info("");
+            Log.Info("=====[ Verdansk GameBot Started ]=====");
+            Log.Info("");
+
             #region  OnBotReady Debugging
 
 #if DEBUG
-            var gs = new GameServerModel { ServerName = "ASD" };
-            var asd = await GameServerWatcher.QueryGameServerAsync(gs);
-            Debugger.Break();
+
 #endif
 
             #endregion
 
+            await GameServerWatcher.StartAsync(BotClient.Guilds);
+            
             return;// Task.CompletedTask;
         }
 

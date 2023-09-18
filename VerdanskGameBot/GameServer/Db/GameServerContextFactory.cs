@@ -15,11 +15,11 @@ using VerdanskGameBot.Ext;
 
 namespace VerdanskGameBot.GameServer.Db
 {
-    internal class GameServerContextFactory : IDesignTimeDbContextFactory<GameServerDb>
+    internal class GameServerContextFactory : IDesignTimeDbContextFactory<GameBotDb>
     {
-        public GameServerDb CreateDbContext(string[] args)
+        public GameBotDb CreateDbContext(string[] args)
         {
-            GameServerDb db = null;
+            GameBotDb db = null;
 
             var config = new ConfigurationBuilder().AddCommandLine(args).Build();
             var optionsBuilder = new DbContextOptionsBuilder();
@@ -62,21 +62,21 @@ namespace VerdanskGameBot.GameServer.Db
         }
     }
 
-    internal class GameServerPostgreSqlDb : GameServerDb
+    internal class GameServerPostgreSqlDb : GameBotDb
     {
         public GameServerPostgreSqlDb(DbContextOptions options) : base(options)
         {
         }
     }
 
-    internal class GameServerSqlServerDb : GameServerDb
+    internal class GameServerSqlServerDb : GameBotDb
     {
         public GameServerSqlServerDb(DbContextOptions options) : base(options)
         {
         }
     }
 
-    internal class GameServerMySqlDb : GameServerDb
+    internal class GameServerMySqlDb : GameBotDb
     {
         public GameServerMySqlDb(DbContextOptions options) : base(options)
         {

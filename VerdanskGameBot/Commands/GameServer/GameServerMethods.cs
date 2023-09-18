@@ -103,19 +103,6 @@ namespace VerdanskGameBot.Commands.GameServer
                 Note = modal.Note
             };
 
-            try
-            {
-                using (var db = new GameBotDb(Context.Guild))
-                {
-                    db.Add(gs);
-                    //db.SaveChanges();
-                }
-            }
-            catch (Exception)
-            {
-                return Task.FromException<GameServerModel>(new GameServerDbAddException());
-            }
-
             return Task.FromResult(gs);
         }
 
@@ -131,6 +118,19 @@ namespace VerdanskGameBot.Commands.GameServer
             reggs.ChannelId = Context.Channel.Id;
             reggs.MessageId = placeholder.Id;
             reggs.ThreadId = thread.Id;
+
+            try
+            {
+                using (var db = new GameBotDb(Context.Guild))
+                {
+                    db.Add(reggs);
+                    db.SaveChanges();
+                }
+            }
+            catch (Exception)
+            {
+                throw new GameServerDbAddException();
+            }
         }
     }
 }

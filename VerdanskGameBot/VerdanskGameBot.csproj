@@ -39,7 +39,7 @@
     <Compile Remove="Commands\ChangeServerModalBuilder.cs" />
     <Compile Remove="Commands\CommandService.cs" />
     <Compile Remove="Commands\CommandServiceVars.cs" />
-    <Compile Remove="GameServer\GameServerEmbedBuilder.cs" />
+    <Compile Remove="GameServer\Db\GameServerContextFactory.cs" />
     <Compile Remove="GameServer\GameServerWatcher_OLd.cs" />
   </ItemGroup>
 
@@ -76,29 +76,25 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="6.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="6.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="6.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="6.*">
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="7.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="7.0.2">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="6.*" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="6.*" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="7.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="7.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.0" />
     <PackageReference Include="NLog" Version="5.*" />
     <PackageReference Include="NLog.Extensions.Logging" Version="5.2.1" />
     <PackageReference Include="NodaTime" Version="3.1.6" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="6.*" />
-    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="6.*" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="7.0.1" />
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="7.0.0-silver.1" />
   </ItemGroup>
 
   <ItemGroup>
     <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="GameServer\Db\Migrations\" />
   </ItemGroup>
 
 </Project>

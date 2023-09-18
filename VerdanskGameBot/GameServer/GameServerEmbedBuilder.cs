@@ -11,7 +11,22 @@ namespace VerdanskGameBot.GameServer
 {
     internal class GameServerEmbedBuilder : EmbedBuilder
     {
-        internal GameServerEmbedBuilder(GameServerModel server, IEmbed embed = null)
+        internal GameServerEmbedBuilder(GameServerModel server)
+        {
+            var title = ReplaceIfNullOrEmpty(server.DisplayName, string.Empty);
+            var desc = Environment.NewLine
+                       + ReplaceIfNullOrEmpty(server.Description, string.Empty)
+                       + Environment.NewLine;
+            var img = ReplaceIfNullOrEmpty(server.ImageUrl, string.Empty);
+
+            WithTitle(title);
+            WithDescription(desc);
+            WithImageUrl(img);
+
+            PopulateFields(server);
+        }
+
+        internal GameServerEmbedBuilder(GameServerModel server, IEmbed embed)
         {
             var title = ReplaceIfNullOrEmpty(server.DisplayName, embed.Title);
             var desc = Environment.NewLine
@@ -23,11 +38,16 @@ namespace VerdanskGameBot.GameServer
             WithDescription(desc);
             WithImageUrl(img);
 
+            PopulateFields(server);
+        }
+
+        private void PopulateFields(GameServerModel server)
+        {
             var rand = new Random((int)(DateTimeOffset.Now - server.AddedSince).Ticks);
             WithColor(new Color(rand.Next(255), rand.Next(255), rand.Next(255)));
 
             var isonlinestr = server.IsOnline ? ":green_circle: Online" : ":red_circle: Offline";
-            var lastonlinetimestr = "Last Online : " + server.LastOnline is not null ? $"<t:{server.LastOnline.Value.ToUnixTimeSeconds()}:R>" : "Never";
+            var lastonlinetimestr = "Last Online : " + (server.LastOnline is not null ? $"<t:{server.LastOnline.Value.ToUnixTimeSeconds()}:R>" : "Never");
             AddField(isonlinestr, (!server.IsOnline ? lastonlinetimestr : "") + Environment.NewLine, true);
 
             AddField("IP Address", server.IP.ToString(), true);
@@ -38,15 +58,15 @@ namespace VerdanskGameBot.GameServer
 
             AddField("Players", $"{server.Players}/{server.MaxPlayers}", true);
 
-            AddField("NOTE", server.Note + Environment.NewLine);
+            AddField("NOTE", ReplaceIfNullOrEmpty(server.Note, "-") + Environment.NewLine);
 
             WithFooter($"Last checked ->");
             WithCurrentTimestamp();
         }
 
-        private string ReplaceIfNullOrEmpty(string newstr, string existstr)
+        private string ReplaceIfNullOrEmpty(string str1, string str2)
         {
-            return string.IsNullOrEmpty(newstr) ? (string.IsNullOrEmpty(existstr) ? "" : existstr) : newstr;
+            return !string.IsNullOrEmpty(str1) ? str1 : str2;
         }
     }
 }
