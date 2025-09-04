@@ -363,3 +363,5 @@ MigrationBackup/
 FodyWeavers.xsd
 /VerdanskGameBot/package.json
 /VerdanskGameBot/package-lock.json
+/VerdanskGameBot/nodejs
+/VerdanskGameBot/node_modules
