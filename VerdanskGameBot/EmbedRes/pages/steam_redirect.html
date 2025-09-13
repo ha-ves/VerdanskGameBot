@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Steam Redirect</title>
+    <meta charset="utf-8" />
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 600px;
+            margin: 2em auto;
+        }
+
+        .consent-box {
+            border: 1px solid #ccc;
+            padding: 2em;
+            border-radius: 8px;
+        }
+
+        button {
+            font-size: 1em;
+            padding: 0.5em 1em;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+    <script type="text/javascript">let steamUrl = "";
+
+      window.onload = function () {
+        const params = new URLSearchParams(window.location.search);
+        const ip = params.get('ip');
+        const port = params.get('port');
+
+        if (ip && port) {
+          steamUrl = `steam://${ip}:${port}`;
+          document.getElementById('destination').innerText = steamUrl;
+          document.getElementById('manual-link').href = steamUrl;
+          document.getElementById('manual-link').innerText = steamUrl;
+
+          // --- Consent and click-to-redirect logic (commented out) ---
+          // Show consent box and wait for user click before redirecting.
+          // function giveConsent() {
+          //   window.location.href = steamUrl;
+          // }
+          // User must click "I Consent" before redirecting.
+
+          // --- Automatic redirect ---
+          window.location.href = steamUrl;
+        } else {
+          document.getElementById('main').innerHTML = "<b>Missing parameters!</b>";
+        }
+      };</script>
+</head>
+<body>
+    <div id="main" class="consent-box">
+        <h2>Steam Link Redirect</h2>
+        <p>
+            You are about to be redirected to a Steam link:<br>
+            <b id="destination"></b>
+        </p>
+        <!--
+        <p>
+          For privacy and compliance reasons, we require your consent before redirecting.<br>
+          By clicking "I Consent", your action may be recorded for audit and you will be taken to the destination.<br>
+        </p>
+        <button onclick="giveConsent()">I Consent</button>
+        <p>
+          If you do not wish to proceed, simply close this page.<br>
+          Alternatively, you can copy the destination URL above and use it manually.
+        </p>
+        -->
+        <p>
+            If you are not automatically redirected, <a id="manual-link" href="#">click here</a>.
+        </p>
+    </div>
+</body>
+</html>

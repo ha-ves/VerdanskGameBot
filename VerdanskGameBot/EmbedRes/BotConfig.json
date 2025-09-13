@@ -1,0 +1,9 @@
+{
+    "BotToken": "",
+    "GuildId": 0,
+    "LocalIP": "127.0.0.1",
+    "DbProvider": "sqlite",
+    "ConnectionString": "Data Source=gameservers.db;",
+    "Verbose": false,
+    "SteamRedirectPage": "https://verdanskgamebot.github.io/steam_redirect.html"
+}

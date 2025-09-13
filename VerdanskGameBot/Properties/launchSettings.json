@@ -2,7 +2,21 @@
   "profiles": {
     "VerdanskGameBot": {
       "commandName": "Project",
-      "commandLineArgs": "--version"
+      "commandLineArgs": "--verbose"
+    },
+    "Add Migration": {
+      "commandName": "Executable",
+      "executablePath": "powershell",
+      "commandLineArgs": "-ExecutionPolicy Bypass -Command \"$workdir = git rev-parse --show-toplevel; Set-Location $workdir; & '.\\Databases\\GameServerDb\\Scripts\\AddMigration.ps1' -NoBuild\""
+    },
+    "Update Database": {
+      "commandName": "Executable",
+      "executablePath": "powershell",
+      "commandLineArgs": "-ExecutionPolicy Bypass -Command \"$workdir = git rev-parse --show-toplevel; Set-Location $workdir; & '.\\Databases\\GameServerDb\\Scripts\\UpdateDatabase.ps1' -NoBuild\""
+    },
+    "WSL": {
+      "commandName": "WSL2",
+      "distributionName": ""
     }
   }
 }

@@ -1,11 +1,12 @@
 ﻿using Discord;
-using NodaTime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using VerdanskGameBot.Ext;
 using VerdanskGameBot.GameServer.Db;
+using VerdanskGameBot.GameServer.Db.Models;
 
 namespace VerdanskGameBot.GameServer
 {
@@ -13,60 +14,36 @@ namespace VerdanskGameBot.GameServer
     {
         internal GameServerEmbedBuilder(GameServerModel server)
         {
-            var title = ReplaceIfNullOrEmpty(server.DisplayName, string.Empty);
-            var desc = Environment.NewLine
-                       + ReplaceIfNullOrEmpty(server.Description, string.Empty)
-                       + Environment.NewLine;
-            var img = ReplaceIfNullOrEmpty(server.ImageUrl, string.Empty);
+            Title = server.DisplayName ?? "New Game Server.";
+            Description = Environment.NewLine
+                        + server.Description ?? "A new game server is being added."
+                        + Environment.NewLine;
 
-            WithTitle(title);
-            WithDescription(desc);
-            WithImageUrl(img);
+            ImageUrl = ThumbnailUrl = server.ImageUrl;
 
-            PopulateFields(server);
-        }
-
-        internal GameServerEmbedBuilder(GameServerModel server, IEmbed embed)
-        {
-            var title = ReplaceIfNullOrEmpty(server.DisplayName, embed.Title);
-            var desc = Environment.NewLine
-                       + ReplaceIfNullOrEmpty(server.Description, embed.Description)
-                       + Environment.NewLine;
-            var img = ReplaceIfNullOrEmpty(server.ImageUrl, embed.Image.Value.Url);
-
-            WithTitle(title);
-            WithDescription(desc);
-            WithImageUrl(img);
-
-            PopulateFields(server);
-        }
-
-        private void PopulateFields(GameServerModel server)
-        {
-            var rand = new Random((int)(DateTimeOffset.Now - server.AddedSince).Ticks);
-            WithColor(new Color(rand.Next(255), rand.Next(255), rand.Next(255)));
+            Color = new Color(Random.Shared.Next(255), Random.Shared.Next(255), Random.Shared.Next(255));
 
             var isonlinestr = server.IsOnline ? ":green_circle: Online" : ":red_circle: Offline";
-            var lastonlinetimestr = "Last Online : " + (server.LastOnline is not null ? $"<t:{server.LastOnline.Value.ToUnixTimeSeconds()}:R>" : "Never");
-            AddField(isonlinestr, (!server.IsOnline ? lastonlinetimestr : "") + Environment.NewLine, true);
+            var lastonlinetimestr = "Last Online : " + (server.LastOnline is not null ?
+                $"<t:{server.LastOnline.Value.ToUnixTimeSeconds()}:R>" : "Never");
 
-            AddField("IP Address", server.IP.ToString(), true);
-            AddField("Game Port", server.GamePort.ToString(), true);
+            AddField(isonlinestr, (!server.IsOnline ? lastonlinetimestr : '.') + Environment.NewLine, true);
 
-            var joinserver = ReplaceIfNullOrEmpty(server.GameLink, "--Server don't provide join link.--");
-            AddField("Join This Server", joinserver, true);
+            AddField("IP Address", server.IP?.ToString() ?? "N/A", true);
+            AddField("Game Port", server.GamePort == 0 ? "N/A" : server.GamePort.ToString(), true);
+
+            AddField("Join This Server", server.GameLink ?? "-- Server doesn't provide join link. --", true);
 
             AddField("Players", $"{server.Players}/{server.MaxPlayers}", true);
 
-            AddField("NOTE", ReplaceIfNullOrEmpty(server.Note, "-") + Environment.NewLine);
+            AddField("Notes", (string.IsNullOrWhiteSpace(server.Note) ? '-' : server.Note) + Environment.NewLine);
 
-            WithFooter($"Last checked ->");
+            var now = DateTimeOffset.UtcNow;
+            var clockUnicode = Helper.ClockEmoji(now.Hour % 12, (now.Minute / 30) * 30);
+
+            WithFooter($"Last checked -> {clockUnicode}");
+
             WithCurrentTimestamp();
-        }
-
-        private string ReplaceIfNullOrEmpty(string str1, string str2)
-        {
-            return !string.IsNullOrEmpty(str1) ? str1 : str2;
         }
     }
 }
